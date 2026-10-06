@@ -65,13 +65,14 @@ class WipFixService extends Base
         $view = new WipView($this->container);
         $cat = new WipCatalogue();
         $now = time();
-        $lookback = $cat->threshold('closed_lookback_days');
+        // The lookback window is a display filter, not a guard: re-evaluate over the widest window
+        // getWipFlags accepts, so any row a caller was shown can be fixed.
+        $lookback = WipView::MAX_LOOKBACK_DAYS;
         $columns = (new WipQuery($this->container))->columns([$pid]);
         $facts = $view->facts($scope, $columns, $now - $lookback * 86400, $taskId);
         $fact = $facts[0] ?? null;
 
-        if ($action === 'move_to_done' && $fact !== null
-            && (in_array('hold', $fact['tags'], true) || WipFlagRules::hasWayfinder($fact['tags']))) {
+        if ($action === 'move_to_done' && $fact !== null && self::heldFromDone($fact['tags'])) {
             return self::no('hold');
         }
         $flags = $fact === null ? [] : WipFlagRules::evaluate($fact, $cat, $now, $lookback, $cat->available())['flags'];
@@ -119,6 +120,29 @@ class WipFixService extends Base
         ]);
 
         return ['ok' => true, 'task_id' => $taskId, 'action' => $action, 'comment_id' => (int) $commentId];
+    }
+
+    /** Tickets tagged `hold` or `wayfinder:*` are never moved to Done. */
+    public static function heldFromDone(array $tags): bool
+    {
+        return in_array('hold', $tags, true) || WipFlagRules::hasWayfinder($tags);
+    }
+
+    /**
+     * Can the one-click fix for a row's top flag succeed? The single guard behind a row's
+     * fix.oneclick (WipView) and the refusals apply() would otherwise return for it.
+     */
+    public static function oneClickable(?string $flag, array $tags, bool $hasAssignee, WipCatalogue $cat): bool
+    {
+        if ($flag === null || ! $cat->flag($flag)['oneclick']) {
+            return false;
+        }
+        foreach (self::ACTIONS as $action => $flags) {
+            if (in_array($flag, $flags, true)) {
+                return $action === 'assign' ? $hasAssignee : ! self::heldFromDone($tags);
+            }
+        }
+        return false;
     }
 
     /**

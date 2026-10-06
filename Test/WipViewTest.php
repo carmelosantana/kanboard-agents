@@ -117,6 +117,27 @@ class WipViewTest extends Base
         $this->assertSame(['action' => 'noowner', 'oneclick' => true, 'url' => '/task/'.$t, 'location' => null], $rows[0]['fix']);
     }
 
+    public function testMoveToDoneIsNotOneClickOnHoldOrWayfinderTickets(): void
+    {
+        $held = $this->task($this->pid, 'In progress', $this->carmelo, 'held');
+        $this->touch($held, ['is_active' => 0, 'date_completed' => $this->now - self::DAY]);
+        $this->tags($this->pid, $held, ['hold']);
+        $map = $this->task($this->pid, 'In progress', $this->carmelo, 'map');
+        $this->subtask($map, 'a', 2);
+        $this->tags($this->pid, $map, ['wayfinder:map']);
+        $rows = array_column($this->rpc()['rows'], 'fix', 'task_id');
+        $this->assertSame(['mismatch', false], [$rows[$held]['action'], $rows[$held]['oneclick']]);
+        $this->assertSame(['donesubs', false], [$rows[$map]['action'], $rows[$map]['oneclick']]);
+    }
+
+    public function testNoOwnerIsNotOneClickWhenNobodyIsAssignable(): void
+    {
+        $q = $this->project('Q', [$this->carmelo => Role::PROJECT_VIEWER, $this->claude => Role::PROJECT_VIEWER]);
+        $t = $this->task($q, 'In progress');
+        $rows = array_column($this->rpc()['rows'], 'fix', 'task_id');
+        $this->assertSame(['noowner', false], [$rows[$t]['action'], $rows[$t]['oneclick']]);
+    }
+
     public function testDisabledAgentKeepsItsTicketsWithAMarker(): void
     {
         $t = $this->task($this->pid, 'In progress', $this->claude);

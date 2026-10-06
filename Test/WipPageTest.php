@@ -72,6 +72,16 @@ class WipPageTest extends Base
         $this->assertStringContainsString('<b>carmelo</b>', $html);
     }
 
+    public function testNoOwnerWithNobodyAssignableRendersALinkNotADeadForm(): void
+    {
+        $q = $this->project('Q', [$this->carmelo => Role::PROJECT_VIEWER, $this->claude => Role::PROJECT_VIEWER]);
+        $this->task($q, 'In progress', 0, 'nobody can take me');
+        $html = $this->render('queue');
+        $this->assertStringContainsString('nobody can take me', $html);
+        $this->assertStringNotContainsString('name="assignee_id"', $html);
+        $this->assertStringContainsString('Assign →', $html);
+    }
+
     public function testEmptyViewSaysSo(): void
     {
         $this->assertStringContainsString('Nothing in progress', $this->render('queue'));

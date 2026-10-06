@@ -8,6 +8,7 @@ use Kanboard\Core\Base;
 class WipView extends Base
 {
     const ROLE_LABELS = ['in_progress' => 'In progress', 'ready' => 'Ready', 'done' => 'Done'];
+    const MAX_LOOKBACK_DAYS = 365;
 
     /** The getWipFlags envelope. Params are untyped RPC input; malformed ones throw InvalidArgumentException. */
     public function flags($ownerUserId = null, $scope = 'all', $projectIds = null, $includeUnflagged = false, $closedLookbackDays = null, ?int $now = null): array
@@ -49,8 +50,8 @@ class WipView extends Base
         $projects = Params::idList($projectIds, 'project_ids');
         $unflagged = Params::flag($includeUnflagged, 'include_unflagged');
         $lookback = $closedLookbackDays === null ? $cat->threshold('closed_lookback_days') : Params::id($closedLookbackDays);
-        if ($lookback < 1 || $lookback > 365) {
-            throw new \InvalidArgumentException('closed_lookback_days must be 1..365');
+        if ($lookback < 1 || $lookback > self::MAX_LOOKBACK_DAYS) {
+            throw new \InvalidArgumentException('closed_lookback_days must be 1..'.self::MAX_LOOKBACK_DAYS);
         }
 
         $s = (new WipScope($this->container))->resolve($owner, $scope, $projects);
@@ -92,6 +93,8 @@ class WipView extends Base
         }
 
         $rows = [];
+        $fixer = new WipFixService($this->container);
+        $assignable = [];
         foreach ($this->facts($s, $columns, $now - $lookback * 86400) as $f) {
             $ev = WipFlagRules::evaluate($f, $cat, $now, $lookback, $cat->available());
             if ($f['is_active'] === 1 && $f['role'] === 'in_progress') {
@@ -106,7 +109,12 @@ class WipView extends Base
             if ($ev['flags'] === [] && ! ($unflagged && $f['is_active'] === 1)) {
                 continue;
             }
-            $rows[] = $this->row($f, $ev, $cat, $s);
+            $hasAssignee = false;
+            if ($ev['fix'] === 'noowner') {
+                $assignable[$f['project_id']] ??= $fixer->assignees($f['project_id'], $s) !== [];
+                $hasAssignee = $assignable[$f['project_id']];
+            }
+            $rows[] = $this->row($f, $ev, $cat, $s, $hasAssignee);
         }
 
         $env['rows'] = array_map(function ($r) {
@@ -199,7 +207,7 @@ class WipView extends Base
         return in_array($f['owner_id'], $scope['owner_ids'], true);
     }
 
-    private function row(array $f, array $ev, WipCatalogue $cat, array $scope): array
+    private function row(array $f, array $ev, WipCatalogue $cat, array $scope, bool $hasAssignee): array
     {
         $loc = self::location($f['meta']);
         $person = $scope['people'][$f['owner_id']] ?? null;
@@ -219,7 +227,7 @@ class WipView extends Base
             'rank_weight' => $ev['rank_weight'],
             'fix' => [
                 'action' => $ev['fix'],
-                'oneclick' => $ev['fix'] !== null && $cat->flag($ev['fix'])['oneclick'],
+                'oneclick' => WipFixService::oneClickable($ev['fix'], $f['tags'], $hasAssignee, $cat),
                 'url' => '/task/'.$f['task_id'],
                 'location' => $loc,
             ],

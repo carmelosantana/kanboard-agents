@@ -150,6 +150,15 @@ class WipFixServiceTest extends Base
         $this->assertSame('not_flagged', $this->fix($this->task($this->pid, 'In progress', $this->carmelo), 'assign', $this->claude)['reason']);
     }
 
+    public function testLookbackIsNotAGuardForOlderClosedTickets(): void
+    {
+        // A getWipFlags caller with closed_lookback_days=60 sees this row; the fix must not refuse it.
+        $t = $this->task($this->pid, 'In progress', $this->carmelo);
+        $this->touch($t, ['is_active' => 0, 'date_completed' => time() - 60 * 86400]);
+        $this->assertTrue($this->fix($t, 'move_to_done')['ok']);
+        $this->assertSame($this->col($this->pid, 'Done'), (int) $this->task_($t)['column_id']);
+    }
+
     public function testHoldAndWayfinderAreNeverMovedToDone(): void
     {
         $hold = $this->closedOutsideDone($this->carmelo);
