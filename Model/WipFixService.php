@@ -2,6 +2,7 @@
 namespace Kanboard\Plugin\Agents\Model;
 
 use Kanboard\Core\Base;
+use Kanboard\Core\Security\Role;
 
 // The one write path for the WIP view (Decisions 19-22), shared by the page's CSRF POST and the
 // applyWipFix RPC. Guards, then moves/closes/assigns, then posts the 🧭 comment. Move provenance
@@ -53,6 +54,10 @@ class WipFixService extends Base
         if ($scope['caller_is_agent'] && $owner !== 0 && ! in_array($owner, $scope['roster_agent_ids'], true)) {
             return self::no('forbidden');
         }
+        // Read visibility is not write permission: a project-viewer (or non-member) never fixes.
+        if (! $this->mayWrite($pid)) {
+            return self::no('forbidden');
+        }
         if ((int) $task['date_modification'] !== (int) $expectedDateModification) {
             return self::no('changed');
         }
@@ -80,6 +85,9 @@ class WipFixService extends Base
             if (! isset($candidates[$assignee])) {
                 return self::no('invalid_assignee');
             }
+            if (! $this->helper->projectRole->canChangeAssignee($task)) {
+                return self::no('forbidden');
+            }
             $this->taskModificationModel->update(['id' => $taskId, 'owner_id' => $assignee]);
             $label = 'Assign to '.$candidates[$assignee];
         } else {
@@ -87,6 +95,11 @@ class WipFixService extends Base
                 return self::no('no_done_column');
             }
             $done = $columns[$pid]['done'][0];
+            // Custom project roles: core's own move/close restriction checks, as its controllers use them.
+            if (! $this->helper->projectRole->canMoveTask($pid, (int) $task['column_id'], $done)
+                || ($flag === 'donesubs' && ! $this->helper->projectRole->canChangeTaskStatusInColumn($pid, $done))) {
+                return self::no('forbidden');
+            }
             $swimlane = (int) $task['swimlane_id'];
             if ((int) $task['column_id'] !== $done) {
                 $position = $this->taskFinderModel->countByColumnAndSwimlaneId($pid, $done, $swimlane) + 1;
@@ -121,6 +134,15 @@ class WipFixService extends Base
             }
         }
         return $out;
+    }
+
+    private function mayWrite(int $projectId): bool
+    {
+        if ($this->userSession->isAdmin()) {
+            return true;
+        }
+        $role = $this->projectUserRoleModel->getUserRole($projectId, (int) $this->userSession->getId());
+        return $role !== '' && $role !== Role::PROJECT_VIEWER;
     }
 
     public static function comment(string $action, string $flagLabel, string $user): string

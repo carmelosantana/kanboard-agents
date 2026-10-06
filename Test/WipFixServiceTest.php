@@ -4,6 +4,7 @@ require_once __DIR__.'/WipFixture.php';
 
 use KanboardTests\units\Base;
 use Kanboard\Core\Security\Role;
+use Kanboard\Model\ProjectRoleRestrictionModel;
 use Kanboard\Plugin\Agents\Api\AgentsWipProcedure;
 use Kanboard\Plugin\Agents\Subscriber\MoveProvenanceSubscriber;
 
@@ -180,6 +181,44 @@ class WipFixServiceTest extends Base
         $t = $this->task($hidden, 'In progress', $this->carmelo);
         $this->touch($t, ['is_active' => 0, 'date_completed' => time()]);
         $this->assertSame('forbidden', $this->fix($t, 'move_to_done')['reason']);
+    }
+
+    public function testProjectViewerMayNotWrite(): void
+    {
+        $t = $this->closedOutsideDone($this->carmelo);
+        $this->container['projectUserRoleModel']->changeUserRole($this->pid, $this->carmelo, Role::PROJECT_VIEWER);
+        $this->assertSame(['ok' => false, 'reason' => 'forbidden'], $this->fix($t, 'move_to_done'));
+        $this->assertNotSame($this->col($this->pid, 'Done'), (int) $this->task_($t)['column_id']);
+        $this->assertSame([], $this->container['commentModel']->getAll($t));
+    }
+
+    public function testCustomRoleMoveRestrictionIsHonoured(): void
+    {
+        $t = $this->closedOutsideDone($this->carmelo);
+        $roleId = $this->container['projectRoleModel']->create($this->pid, 'no-move');
+        $this->container['projectRoleRestrictionModel']->create($this->pid, $roleId, ProjectRoleRestrictionModel::RULE_TASK_MOVE);
+        $this->container['projectUserRoleModel']->changeUserRole($this->pid, $this->carmelo, 'no-move');
+        $this->assertSame(['ok' => false, 'reason' => 'forbidden'], $this->fix($t, 'move_to_done'));
+        $this->assertNotSame($this->col($this->pid, 'Done'), (int) $this->task_($t)['column_id']);
+        $this->assertSame([], $this->container['commentModel']->getAll($t));
+    }
+
+    public function testCustomRoleAssigneeRestrictionIsHonoured(): void
+    {
+        $t = $this->task($this->pid, 'In progress');
+        $roleId = $this->container['projectRoleModel']->create($this->pid, 'no-assign');
+        $this->container['projectRoleRestrictionModel']->create($this->pid, $roleId, ProjectRoleRestrictionModel::RULE_TASK_CHANGE_ASSIGNEE);
+        $this->container['projectUserRoleModel']->changeUserRole($this->pid, $this->carmelo, 'no-assign');
+        $this->assertSame(['ok' => false, 'reason' => 'forbidden'], $this->fix($t, 'assign', $this->claude));
+        $this->assertSame(0, (int) $this->task_($t)['owner_id']);
+    }
+
+    public function testAdminWhoIsNotAMemberMayFix(): void
+    {
+        $admin = $this->user('boss', Role::APP_ADMIN);
+        $t = $this->closedOutsideDone($admin);
+        $this->actAs($admin);
+        $this->assertTrue($this->fix($t, 'move_to_done')['ok']);
     }
 
     public function testAgentCallerMayNotFixAHumansTicket(): void
