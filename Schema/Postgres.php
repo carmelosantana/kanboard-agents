@@ -1,7 +1,7 @@
 <?php
 namespace Kanboard\Plugin\Agents\Schema;
 
-const VERSION = 1;
+const VERSION = 2;
 
 function version_1($pdo)
 {
@@ -12,4 +12,10 @@ function version_1($pdo)
         kind VARCHAR(50) NOT NULL,
         created_at INTEGER NOT NULL DEFAULT 0
     )');
+}
+
+function version_2($pdo)
+{
+    require_once __DIR__.'/../Model/ProvenanceBackfill.php';
+    \Kanboard\Plugin\Agents\Model\ProvenanceBackfill::run($pdo);
 }

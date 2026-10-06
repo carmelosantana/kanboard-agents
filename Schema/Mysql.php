@@ -1,7 +1,7 @@
 <?php
 namespace Kanboard\Plugin\Agents\Schema;
 
-const VERSION = 1;
+const VERSION = 2;
 
 function version_1($pdo)
 {
@@ -13,4 +13,10 @@ function version_1($pdo)
         created_at INT NOT NULL DEFAULT 0,
         PRIMARY KEY(id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+}
+
+function version_2($pdo)
+{
+    require_once __DIR__.'/../Model/ProvenanceBackfill.php';
+    \Kanboard\Plugin\Agents\Model\ProvenanceBackfill::run($pdo);
 }

@@ -15,11 +15,13 @@ class Plugin extends Base
         $this->route->addRoute('agents',         'AgentController', 'index',   'Agents');
         $this->route->addRoute('agents/create',  'AgentController', 'create',  'Agents');
         $this->route->addRoute('agents/disable', 'AgentController', 'disable', 'Agents');
+
+        (new \Kanboard\Plugin\Agents\Subscriber\MoveProvenanceSubscriber($this->container))->register();
     }
 
     public function getPluginName(): string        { return 'Agents'; }
     public function getPluginDescription(): string { return t('Provision API-only agent users that drive Kanboard via MCP.'); }
     public function getPluginAuthor(): string      { return 'Carmelo Santana'; }
-    public function getPluginVersion(): string     { return '0.1.0'; }
+    public function getPluginVersion(): string     { return '0.2.0'; }
     public function getCompatibleVersion(): string { return '>=1.2.47'; }
 }

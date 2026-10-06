@@ -1,7 +1,7 @@
 {
     "name": "Agents",
     "description": "Provision API-only agent users (per-user roster) that drive Kanboard externally via MCP, with attributed personal-token auth.",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "author": "Carmelo Santana",
     "homepage": "https://github.com/carmelosantana/kanboard-agents",
     "license": "MIT",
