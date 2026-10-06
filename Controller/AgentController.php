@@ -30,7 +30,7 @@ class AgentController extends BaseController
 
     public function create()
     {
-        $this->checkCSRFParam();
+        $this->checkCSRFForm();
         $values = $this->request->getValues();
         $kind = isset($values['kind']) ? preg_replace('/[^a-z0-9-]/', '', strtolower($values['kind'])) : '';
         if ($kind === '') {
