@@ -10,7 +10,7 @@ use Kanboard\Plugin\Agents\Api\AgentsWipProcedure;
 class ProcedureSurfaceTest extends Base
 {
     const SURFACE = [
-        AgentsWipProcedure::class => ['getWipFlags'],
+        AgentsWipProcedure::class => ['getWipFlags', 'applyWipFix'],
         AgentsRosterProcedure::class => ['adoptAgent'],
     ];
 
