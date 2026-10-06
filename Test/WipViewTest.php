@@ -143,7 +143,11 @@ class WipViewTest extends Base
         $t = $this->task($this->pid, 'In progress', $this->claude);
         $this->stale($t);
         $this->container['userModel']->disable($this->claude);
-        $this->assertTrue($this->rpc()['rows'][0]['owner_disabled']);
+        $row = $this->rpc()['rows'][0];
+        $this->assertTrue($row['owner_disabled']);
+        $this->assertSame(['stale'], $row['flags']);
+        // Decision 14: the fix is Assign, as a link to the ticket, not a one-click form.
+        $this->assertSame(['action' => 'assign', 'oneclick' => false, 'url' => '/task/'.$t, 'location' => null], $row['fix']);
     }
 
     public function testIncludeUnflaggedAddsOnlyOpenInProgressRows(): void

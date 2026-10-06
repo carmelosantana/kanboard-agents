@@ -212,6 +212,7 @@ class WipView extends Base
     {
         $loc = self::location($f['meta']);
         $person = $scope['people'][$f['owner_id']] ?? null;
+        $disabled = $person !== null && $person['is_active'] === 0;
         return [
             'task_id' => $f['task_id'],
             'title' => $f['title'],
@@ -223,12 +224,13 @@ class WipView extends Base
             'owner_id' => $f['owner_id'],
             'owner_name' => $person['username'] ?? null,
             'owner_kind' => $f['owner_kind'],
-            'owner_disabled' => $person !== null && $person['is_active'] === 0,
+            'owner_disabled' => $disabled,
             'flags' => $ev['flags'],
             'rank_weight' => $ev['rank_weight'],
             'fix' => [
-                'action' => $ev['fix'],
-                'oneclick' => WipFixService::oneClickable($ev['fix'], $f['tags'], $hasAssignee, $cat),
+                // Decision 14: a disabled owner's ticket needs a new owner first: Assign, as a link.
+                'action' => $disabled ? 'assign' : $ev['fix'],
+                'oneclick' => ! $disabled && WipFixService::oneClickable($ev['fix'], $f['tags'], $hasAssignee, $cat),
                 'url' => '/task/'.$f['task_id'],
                 'location' => $loc,
             ],

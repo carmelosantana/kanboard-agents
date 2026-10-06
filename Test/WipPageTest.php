@@ -82,6 +82,17 @@ class WipPageTest extends Base
         $this->assertStringContainsString('Assign →', $html);
     }
 
+    public function testDisabledOwnerRendersAnAssignLink(): void
+    {
+        $t = $this->task($this->pid, 'In progress', $this->claude, 'orphaned by a disabled agent');
+        $this->touch($t, ['is_active' => 0, 'date_completed' => time() - 3600]);
+        $this->container['userModel']->disable($this->claude);
+        $html = $this->render('queue');
+        $this->assertStringContainsString('orphaned by a disabled agent', $html);
+        $this->assertStringContainsString('Assign →', $html);
+        $this->assertStringNotContainsString('name="fix_action"', $html);
+    }
+
     public function testEmptyViewSaysSo(): void
     {
         $this->assertStringContainsString('Nothing in progress', $this->render('queue'));

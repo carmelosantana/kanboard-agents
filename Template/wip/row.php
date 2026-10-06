@@ -32,7 +32,8 @@ if ($loc !== null) {
 $action = $row['fix']['action'];
 $fixHtml = $this->url->link(t('Open'), 'TaskViewController', 'show', ['task_id' => $row['task_id']], false, 'agents-wip-link');
 if ($action !== null) {
-    $def = $catalogue[$action];
+    // 'assign' (a disabled owner, Decision 14) is a row marker, not a catalogue flag.
+    $def = $action === 'assign' ? ['fix' => t('Assign')] : $catalogue[$action];
     if ($row['fix']['oneclick']) {
         $hidden = $this->form->csrf()
             .'<input type="hidden" name="task_id" value="'.(int) $row['task_id'].'">'
