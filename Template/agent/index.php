@@ -9,6 +9,20 @@
     <button type="submit" class="btn btn-blue"><?= t('Create agent') ?></button>
 </form>
 
+<?php if ($is_admin): ?>
+<h3><?= t('Adopt an existing user') ?></h3>
+<form method="post" action="<?= $this->url->href('AgentController', 'adopt', ['plugin' => 'Agents']) ?>" class="form-inline">
+    <?= $this->form->csrf() ?>
+    <?= $this->form->label(t('User'), 'agent_user_id') ?>
+    <?= $this->form->select('agent_user_id', $users, [], []) ?>
+    <?= $this->form->label(t('Owner'), 'owner_user_id') ?>
+    <?= $this->form->select('owner_user_id', $users, [], []) ?>
+    <label for="form-adopt-kind"><?= t('Kind') ?></label>
+    <input type="text" name="kind" id="form-adopt-kind" placeholder="claude" required pattern="[a-z0-9\-]{1,32}">
+    <button type="submit" class="btn btn-blue"><?= t('Adopt') ?></button>
+</form>
+<?php endif ?>
+
 <table class="table-striped">
     <tr><th><?= t('Agent') ?></th><th><?= t('Kind') ?></th><?= $is_admin ? '<th>'.t('Owner').'</th>' : '' ?><th><?= t('Status') ?></th><th><?= t('Actions') ?></th></tr>
     <?php foreach ($agents as $a): ?>

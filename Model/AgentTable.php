@@ -17,6 +17,15 @@ class AgentTable extends Base
         ]);
     }
 
+    /** Register an existing user as an agent of an owner. False when the user is already on the roster. */
+    public function adopt($ownerUserId, $agentUserId, $kind): bool
+    {
+        if ($this->getByAgent($agentUserId) !== null) {
+            return false;
+        }
+        return (bool) $this->insert($ownerUserId, $agentUserId, $kind);
+    }
+
     public function getByOwner($ownerUserId)
     {
         return $this->db->table(self::TABLE)->eq('owner_user_id', (int) $ownerUserId)->asc('id')->findAll();

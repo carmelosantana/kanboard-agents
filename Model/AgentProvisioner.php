@@ -37,6 +37,42 @@ class AgentProvisioner extends Base
         return ['agent_user_id' => (int) $agentId, 'username' => $username, 'token' => $token];
     }
 
+    /**
+     * Admin-only: put an existing user on an owner's roster (Kanboard #4882).
+     * Never throws for authorization; returns {ok: false, reason} instead.
+     */
+    public function adopt($agentUserId, $ownerUserId, $kind): array
+    {
+        if (! $this->userSession->isLogged() || ! $this->userSession->isAdmin()) {
+            return ['ok' => false, 'reason' => 'forbidden'];
+        }
+        $agentUserId = Params::id($agentUserId);
+        $ownerUserId = Params::id($ownerUserId);
+        $kind = is_string($kind) ? strtolower(trim($kind)) : '';
+        if ($kind === '' || ! preg_match('/^[a-z0-9-]{1,32}$/', $kind)) {
+            return ['ok' => false, 'reason' => 'invalid_kind'];
+        }
+        if ($agentUserId === 0 || $ownerUserId === 0
+            || empty($this->userModel->getById($agentUserId)) || empty($this->userModel->getById($ownerUserId))) {
+            return ['ok' => false, 'reason' => 'unknown_user'];
+        }
+        if ($agentUserId === $ownerUserId) {
+            return ['ok' => false, 'reason' => 'self'];
+        }
+        // The roster is one level deep: an owner is never an agent, and an agent never owns agents.
+        $roster = new AgentTable($this->container);
+        if ($roster->getByOwner($agentUserId) !== []) {
+            return ['ok' => false, 'reason' => 'agent_is_owner'];
+        }
+        if ($roster->isAgent($ownerUserId)) {
+            return ['ok' => false, 'reason' => 'owner_is_agent'];
+        }
+        if (! $roster->adopt($ownerUserId, $agentUserId, $kind)) {
+            return ['ok' => false, 'reason' => 'duplicate'];
+        }
+        return ['ok' => true, 'agent_user_id' => $agentUserId, 'owner_user_id' => $ownerUserId, 'kind' => $kind];
+    }
+
     public function disable($agentUserId)
     {
         return $this->userModel->disable((int) $agentUserId);

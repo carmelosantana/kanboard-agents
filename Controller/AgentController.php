@@ -25,6 +25,7 @@ class AgentController extends BaseController
             'title'    => t('My Agents'),
             'agents'   => $rows,
             'is_admin' => $isAdmin,
+            'users'    => $isAdmin ? $this->userModel->getActiveUsersList() : [],
         ]));
     }
 
@@ -59,6 +60,24 @@ class AgentController extends BaseController
         } else {
             $p->disable($agentId);
             $this->flash->success(t('Agent disabled.'));
+        }
+        $this->response->redirect($this->helper->url->to('AgentController', 'index', ['plugin' => 'Agents']));
+    }
+
+    /** Admin-only: register an existing user as an agent of an owner (Kanboard #4882). */
+    public function adopt()
+    {
+        $this->checkCSRFForm();
+        $values = $this->request->getValues();
+        $r = (new AgentProvisioner($this->container))->adopt(
+            $values['agent_user_id'] ?? null,
+            $values['owner_user_id'] ?? null,
+            $values['kind'] ?? ''
+        );
+        if ($r['ok']) {
+            $this->flash->success(t('Agent adopted.'));
+        } else {
+            $this->flash->failure(t('Adopt refused: %s.', $r['reason']));
         }
         $this->response->redirect($this->helper->url->to('AgentController', 'index', ['plugin' => 'Agents']));
     }

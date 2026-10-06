@@ -1,0 +1,29 @@
+/* Agents: WIP page. Loaded only by Template/wip/index.php. Theme-neutral: translucent tints, inherited text. */
+.agents-wip .agents-wip-mute{opacity:.7;font-size:.9em}
+.agents-wip-toggle{cursor:pointer}
+.agents-wip-summary{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 14px;align-items:center}
+.agents-wip-big{font-size:1.15em;margin-right:8px}
+.agents-wip-sum{padding:2px 9px;border-radius:12px;background:rgba(127,127,127,.16);font-size:.9em}
+.agents-wip-zero{opacity:.45}
+.agents-wip-pill{display:inline-block;padding:0 7px;border-radius:10px;font-size:11px;font-weight:600;background:rgba(127,127,127,.18);white-space:nowrap;margin:1px 0}
+.agents-wip-w5{background:rgba(229,62,62,.22)}.agents-wip-w4{background:rgba(214,158,46,.24)}
+.agents-wip-w3{background:rgba(66,133,244,.22)}.agents-wip-w2{background:rgba(128,90,213,.22)}.agents-wip-w1{background:rgba(127,127,127,.18)}
+.agents-wip-queue td{vertical-align:top}
+.agents-wip-red{font-weight:700;text-decoration:underline rgba(229,62,62,.8) 2px}
+.agents-wip-amber{font-weight:700;text-decoration:underline rgba(214,158,46,.8) 2px}
+.agents-wip-who{font-weight:600}.agents-wip-none{opacity:.6}
+.agents-wip-loc{font-size:11px;padding:0 5px;border-radius:8px;background:rgba(127,127,127,.18)}
+.agents-wip-loc-live{background:rgba(56,161,105,.25)}.agents-wip-loc-ended{background:rgba(229,62,62,.22)}.agents-wip-loc-unverified{background:rgba(214,158,46,.25)}
+.agents-wip-copy{font-size:10px;padding:0 4px;border:1px solid rgba(127,127,127,.4);background:transparent;color:inherit;border-radius:4px;cursor:pointer}
+.agents-wip-link{white-space:nowrap}
+.agents-wip-fix{display:inline;margin:0}
+.agents-wip-unflagged{display:none}
+.agents-wip.agents-wip-show-unflagged .agents-wip-unflagged{display:revert;opacity:.65}
+.agents-wip-lanes{display:flex;gap:12px;overflow-x:auto;align-items:flex-start}
+.agents-wip-lane{flex:1 0 280px;background:rgba(127,127,127,.08);border-radius:6px;padding:8px}
+.agents-wip-lanehead{margin-bottom:8px}
+.agents-wip-card{background:rgba(127,127,127,.07);border:1px solid rgba(127,127,127,.25);border-left:4px solid rgba(127,127,127,.4);border-radius:5px;padding:5px 7px;margin-bottom:6px;font-size:12.5px}
+.agents-wip-cw5{border-left-color:rgba(229,62,62,.8)}.agents-wip-cw4{border-left-color:rgba(214,158,46,.8)}
+.agents-wip-cw3{border-left-color:rgba(66,133,244,.8)}.agents-wip-cw2{border-left-color:rgba(128,90,213,.8)}
+.agents-wip-cardfix{margin-top:4px}
+@media (max-width:700px){.agents-wip .agents-wip-owner{display:none}}

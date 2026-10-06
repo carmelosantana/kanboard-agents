@@ -18,6 +18,26 @@ Attribution: actions taken with the agent's personal token are attributed to the
 (`creator_id`), unlike the global app token. Agents remain `app-user` and are granted
 project access via Kanboard's native project UI (owner adds the agent as a project member).
 
+## Work in progress view (0.3.0)
+
+- **Page:** avatar menu → **Work in progress** (also in the dashboard sidebar, and a badge above the
+  header when something is flagged). A ranked queue by default; **By owner** regroups the same rows
+  into one lane per owner. One-click **Move to Done** (Closed, not in Done; All subtasks done) and
+  **Assign** (No owner); every other fix links to the ticket. Each fix posts
+  `🧭 WIP view: <action> (<flag>) by <user>`.
+- **Show unflagged** adds In-progress tickets that have no flag.
+- **Flags:** `catalogue.json` is the canonical catalogue (weights, labels, thresholds);
+  `catalogue_version` is its sha256. Flags whose data does not exist yet (Location, PR state,
+  time back-fill) report `null` counts and are listed in `unavailable_flags`.
+- **JSON-RPC:**
+  - `getWipFlags(owner_user_id?, scope = all|agents|mine, project_ids?, include_unflagged = false, closed_lookback_days = 30)`
+    — read-only. The application token may call it and must pass `owner_user_id`. Refusals come back
+    in `denied: {user_ids, project_ids}`, never as an error.
+  - `applyWipFix(task_id, action = move_to_done|assign, expected_date_modification, assignee_id?)` →
+    `{ok: true, task_id, action, comment_id}` or `{ok: false, reason}`. Refuses the application token.
+  - `adoptAgent(agent_user_id, owner_user_id, kind)` — app-admin only: registers an existing user as an
+    agent of an owner (also on My Agents for admins).
+
 ## Requirements
 
 - Kanboard `>= 1.2.47`, PHP `>= 8.4`. Buildless. No dependency on other suite plugins.

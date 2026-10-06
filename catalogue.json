@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "thresholds": {"stale_days": 3, "unverified_hours": 24, "timemiss_hours": 24, "closed_lookback_days": 30},
+  "flags": [
+    {"key": "stale", "label": "Stale", "weight": 5, "fix": "Message session or park", "oneclick": false, "requires": null, "applies_to": "all"},
+    {"key": "merged", "label": "Merged PR, still open", "weight": 5, "fix": "Move to Done", "oneclick": false, "requires": "pr_state", "applies_to": "agents"},
+    {"key": "donesubs", "label": "All subtasks done", "weight": 4, "fix": "Move to Done", "oneclick": true, "requires": null, "applies_to": "all"},
+    {"key": "offboard", "label": "Worked, not claimed", "weight": 4, "fix": "Claim it", "oneclick": false, "requires": null, "applies_to": "all"},
+    {"key": "ended", "label": "Session ended", "weight": 4, "fix": "Resume or re-claim", "oneclick": false, "requires": "location", "applies_to": "agents"},
+    {"key": "mismatch", "label": "Closed, not in Done", "weight": 3, "fix": "Move to Done", "oneclick": true, "requires": null, "applies_to": "all"},
+    {"key": "blocked", "label": "Blocked", "weight": 2, "fix": "Answer the question", "oneclick": false, "requires": null, "applies_to": "all"},
+    {"key": "unverified", "label": "Unverified", "weight": 2, "fix": "Check that host", "oneclick": false, "requires": "location", "applies_to": "agents"},
+    {"key": "noowner", "label": "No owner", "weight": 1, "fix": "Assign", "oneclick": true, "requires": null, "applies_to": "unowned"},
+    {"key": "timemiss", "label": "Time missing", "weight": 1, "fix": "Install back-fill", "oneclick": false, "requires": "backfill", "applies_to": "agents"}
+  ]
+}
