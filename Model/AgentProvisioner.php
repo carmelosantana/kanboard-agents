@@ -59,7 +59,15 @@ class AgentProvisioner extends Base
         if ($agentUserId === $ownerUserId) {
             return ['ok' => false, 'reason' => 'self'];
         }
-        if (! (new AgentTable($this->container))->adopt($ownerUserId, $agentUserId, $kind)) {
+        // The roster is one level deep: an owner is never an agent, and an agent never owns agents.
+        $roster = new AgentTable($this->container);
+        if ($roster->getByOwner($agentUserId) !== []) {
+            return ['ok' => false, 'reason' => 'agent_is_owner'];
+        }
+        if ($roster->isAgent($ownerUserId)) {
+            return ['ok' => false, 'reason' => 'owner_is_agent'];
+        }
+        if (! $roster->adopt($ownerUserId, $agentUserId, $kind)) {
             return ['ok' => false, 'reason' => 'duplicate'];
         }
         return ['ok' => true, 'agent_user_id' => $agentUserId, 'owner_user_id' => $ownerUserId, 'kind' => $kind];

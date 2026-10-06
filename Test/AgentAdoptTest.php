@@ -59,6 +59,24 @@ class AgentAdoptTest extends Base
         $this->assertSame(['ok' => false, 'reason' => 'duplicate'], $this->rpc()->adoptAgent($this->bot, $this->owner, 'claude'));
     }
 
+    public function testAUserWhoOwnsAgentsCannotBeAdoptedAsOne(): void
+    {
+        $this->actAs($this->admin);
+        $this->assertTrue($this->rpc()->adoptAgent($this->bot, $this->owner, 'claude')['ok']);
+        // carmelo owns carmelo.claude, so carmelo cannot become someone's agent.
+        $this->assertSame(['ok' => false, 'reason' => 'agent_is_owner'], $this->rpc()->adoptAgent($this->owner, $this->admin, 'claude'));
+        $this->assertFalse((new AgentTable($this->container))->isAgent($this->owner));
+    }
+
+    public function testAnAgentCannotOwnAgents(): void
+    {
+        $this->actAs($this->admin);
+        $this->assertTrue($this->rpc()->adoptAgent($this->bot, $this->owner, 'claude')['ok']);
+        $other = $this->container['userModel']->create(['username' => 'helper', 'password' => 'x1234567', 'role' => 'app-user']);
+        $this->assertSame(['ok' => false, 'reason' => 'owner_is_agent'], $this->rpc()->adoptAgent($other, $this->bot, 'claude'));
+        $this->assertFalse((new AgentTable($this->container))->isAgent($other));
+    }
+
     public function testNonAdminIsForbidden(): void
     {
         $this->actAs($this->owner);
