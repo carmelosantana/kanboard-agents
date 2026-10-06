@@ -41,7 +41,7 @@ class WipPageTest extends Base
         $closed = $this->task($this->pid, 'In progress', $this->claude, 'closed early');
         $this->touch($closed, ['is_active' => 0, 'date_completed' => time() - 3600]);
         $unowned = $this->task($this->pid, 'In progress', 0, 'nobody owns me');
-        $plain = $this->task($this->pid, 'Backlog', $this->carmelo, 'quiet one');
+        $plain = $this->task($this->pid, 'In progress', $this->carmelo, 'quiet one');
         return [$closed, $unowned, $plain];
     }
 

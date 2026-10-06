@@ -106,7 +106,8 @@ class WipView extends Base
             foreach ($ev['flags'] as $k) {
                 $env['summary'][$k]++;
             }
-            if ($ev['flags'] === [] && ! ($unflagged && $f['is_active'] === 1)) {
+            // include_unflagged admits only open In-progress tickets; flagged rows are always in.
+            if ($ev['flags'] === [] && ! ($unflagged && $f['is_active'] === 1 && $f['role'] === 'in_progress')) {
                 continue;
             }
             $hasAssignee = false;

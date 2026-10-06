@@ -146,9 +146,11 @@ class WipViewTest extends Base
         $this->assertTrue($this->rpc()['rows'][0]['owner_disabled']);
     }
 
-    public function testIncludeUnflaggedAddsOpenRowsAtTheEnd(): void
+    public function testIncludeUnflaggedAddsOnlyOpenInProgressRows(): void
     {
-        $plain = $this->task($this->pid, 'Backlog', $this->carmelo);
+        $plain = $this->task($this->pid, 'In progress', $this->carmelo);
+        $this->task($this->pid, 'Backlog', $this->carmelo);
+        $this->task($this->pid, 'Ready', $this->claude);
         $this->assertSame([], $this->rpc()['rows']);
         $rows = $this->rpc(null, "all", null, true)["rows"];
         $this->assertSame([$plain], array_column($rows, 'task_id'));
