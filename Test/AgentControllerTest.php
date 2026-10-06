@@ -33,6 +33,18 @@ class AgentControllerTest extends Base
         $this->assertCount(1, (new AgentTable($this->container))->getByOwner(1));
     }
 
+    public function testAdoptFormPatternsCompileUnderTheVFlag(): void
+    {
+        // Browsers compile pattern="" with the RegExp v flag, where an unescaped '-' in a class is a
+        // SyntaxError: the pattern is dropped and the console logs an error on every submit.
+        $html = $this->container['template']->render('Agents:agent/index', [
+            'agents' => [], 'is_admin' => true, 'users' => [1 => 'admin'],
+        ]);
+
+        $this->assertStringContainsString('pattern="[a-z0-9\-]{1,32}"', $html);
+        $this->assertSame(0, preg_match('/pattern="[^"]*[^\\\\]-\]/', $html));
+    }
+
     public function testCreateRejectsAMissingCsrfToken(): void
     {
         $this->post(['kind' => 'codex']);

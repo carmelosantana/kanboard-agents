@@ -18,7 +18,7 @@
     <?= $this->form->label(t('Owner'), 'owner_user_id') ?>
     <?= $this->form->select('owner_user_id', $users, [], []) ?>
     <label for="form-adopt-kind"><?= t('Kind') ?></label>
-    <input type="text" name="kind" id="form-adopt-kind" placeholder="claude" required pattern="[a-z0-9-]{1,32}">
+    <input type="text" name="kind" id="form-adopt-kind" placeholder="claude" required pattern="[a-z0-9\-]{1,32}">
     <button type="submit" class="btn btn-blue"><?= t('Adopt') ?></button>
 </form>
 <?php endif ?>
