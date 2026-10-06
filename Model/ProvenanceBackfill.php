@@ -3,7 +3,8 @@
 namespace Kanboard\Plugin\Agents\Model;
 
 // One-off: derive moved_by_* for every task from the latest move/close/open row in
-// project_activities. Never overwrites an existing stamp. Returns tasks stamped.
+// project_activities. Never overwrites an existing stamp: a task with any moved_by_* / moved_at
+// row is skipped (a partial stamp would hit UNIQUE(task_id,name)). Returns tasks stamped.
 class ProvenanceBackfill
 {
     const EVENTS = ['task.move.column', 'task.close', 'task.open'];
@@ -15,7 +16,7 @@ class ProvenanceBackfill
             $agents[(int) $r['agent_user_id']] = true;
         }
         $stamped = [];
-        foreach ($pdo->query("SELECT task_id FROM task_has_metadata WHERE name = 'moved_by_kind'") as $r) {
+        foreach ($pdo->query("SELECT task_id FROM task_has_metadata WHERE name IN ('moved_by_uid', 'moved_by_kind', 'moved_at')") as $r) {
             $stamped[(int) $r['task_id']] = true;
         }
         $in = "'".implode("','", self::EVENTS)."'";

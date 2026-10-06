@@ -59,6 +59,17 @@ class ProvenanceBackfillTest extends Base
         $this->assertSame('human', $this->meta($t)['moved_by_kind']);
     }
 
+    public function testHalfStampedTaskIsSkippedWithoutThrowing(): void
+    {
+        $t = $this->task();
+        $this->container['taskMetadataModel']->save($t, ['moved_at' => '999']); // a lone moved_at, no moved_by_kind
+        $this->activity($t, $this->agent, 'task.close', 200);
+        $this->assertSame(0, ProvenanceBackfill::run($this->pdo));
+        $m = $this->meta($t);
+        $this->assertSame('999', $m['moved_at']);
+        $this->assertArrayNotHasKey('moved_by_kind', $m);
+    }
+
     public function testTaskWithoutHistoryGetsNothing(): void
     {
         $t = $this->task();
