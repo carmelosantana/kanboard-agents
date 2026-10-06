@@ -4,6 +4,7 @@ namespace Kanboard\Plugin\Agents;
 use Kanboard\Core\Plugin\Base;
 use Kanboard\Core\Translator;
 use Kanboard\Plugin\Agents\Api\AgentsRosterProcedure;
+use Kanboard\Plugin\Agents\Api\AgentsWipProcedure;
 
 class Plugin extends Base
 {
@@ -20,6 +21,7 @@ class Plugin extends Base
 
         // JSON-RPC: withObject so core wins any name clash (withCallback/withClassAndMethod would shadow core).
         $this->api->getProcedureHandler()->withObject(new AgentsRosterProcedure($this->container));
+        $this->api->getProcedureHandler()->withObject(new AgentsWipProcedure($this->container));
 
         (new \Kanboard\Plugin\Agents\Subscriber\MoveProvenanceSubscriber($this->container))->register();
     }
