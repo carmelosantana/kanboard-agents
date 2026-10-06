@@ -15,6 +15,21 @@ class WipView extends Base
         return $this->build($ownerUserId, $scope, $projectIds, $includeUnflagged, $closedLookbackDays, $now)[0];
     }
 
+    /** The header badge: flagged rows in the caller's own view. 0 when logged out or on any failure,
+     *  so a WIP bug never takes down every page. */
+    public function flaggedCount(): int
+    {
+        if (! $this->userSession->isLogged()) {
+            return 0;
+        }
+        try {
+            return (int) $this->flags()['summary']['flagged'];
+        } catch (\Throwable $e) {
+            $this->logger->error('Agents WIP badge: '.$e->getMessage());
+            return 0;
+        }
+    }
+
     /** @return array{0: array, 1: array} the envelope and the resolved WipScope */
     public function build($ownerUserId = null, $scope = 'all', $projectIds = null, $includeUnflagged = false, $closedLookbackDays = null, ?int $now = null): array
     {
