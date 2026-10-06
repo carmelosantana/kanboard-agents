@@ -32,4 +32,9 @@ class AgentTable extends Base
         $row = $this->db->table(self::TABLE)->eq('agent_user_id', (int) $agentUserId)->findOne();
         return $row ?: null;
     }
+
+    public function isAgent(int $userId): bool
+    {
+        return $userId > 0 && $this->getByAgent($userId) !== null;
+    }
 }
