@@ -3,6 +3,7 @@ namespace Kanboard\Plugin\Agents;
 
 use Kanboard\Core\Plugin\Base;
 use Kanboard\Core\Translator;
+use Kanboard\Plugin\Agents\Api\AgentsRosterProcedure;
 
 class Plugin extends Base
 {
@@ -15,6 +16,10 @@ class Plugin extends Base
         $this->route->addRoute('agents',         'AgentController', 'index',   'Agents');
         $this->route->addRoute('agents/create',  'AgentController', 'create',  'Agents');
         $this->route->addRoute('agents/disable', 'AgentController', 'disable', 'Agents');
+        $this->route->addRoute('agents/adopt',   'AgentController', 'adopt',   'Agents');
+
+        // JSON-RPC: withObject so core wins any name clash (withCallback/withClassAndMethod would shadow core).
+        $this->api->getProcedureHandler()->withObject(new AgentsRosterProcedure($this->container));
 
         (new \Kanboard\Plugin\Agents\Subscriber\MoveProvenanceSubscriber($this->container))->register();
     }
