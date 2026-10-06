@@ -54,14 +54,15 @@ class WipScope extends Base
             return $this->deny($out, $viewerId, $projectIds);
         }
 
-        if (! $loggedIn || $isAdmin) {
+        if ($callerRow !== null && (int) $callerRow['owner_user_id'] === $viewerId) {
+            // Agent caller viewing its owner: the owner's view, whatever the agent's app role
+            // (intersected with the agent's own below).
+            $allowed = $this->active($viewerId);
+        } elseif (! $loggedIn || $isAdmin) {
             // App token or app-admin: every active project.
             $allowed = array_map('intval', array_column($this->projectModel->getAllByStatus(ProjectModel::ACTIVE), 'id'));
         } elseif ($viewerId === $callerId) {
             $allowed = $this->active($callerId);
-        } elseif ($callerRow !== null && (int) $callerRow['owner_user_id'] === $viewerId) {
-            // Agent caller viewing its owner: the owner's view, intersected with the agent's own visibility.
-            $allowed = array_values(array_intersect($this->active($viewerId), $this->active($callerId)));
         } else {
             // Project managers see other users only on projects they manage.
             $allowed = array_values(array_filter($this->active($callerId), fn ($pid) =>
@@ -69,6 +70,10 @@ class WipScope extends Base
             if ($allowed === []) {
                 return $this->deny($out, $viewerId, $projectIds);
             }
+        }
+        if ($callerRow !== null) {
+            // Decision 10: an agent never sees beyond its own active projects, whatever its app role.
+            $allowed = array_values(array_intersect($allowed, $this->active($callerId)));
         }
 
         if ($projectIds !== null) {

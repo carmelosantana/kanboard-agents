@@ -116,6 +116,14 @@ class WipScopeTest extends Base
         $this->assertSame([$this->p3, 4242], $s['denied']['project_ids']);
     }
 
+    public function testAdminAgentIsStillIntersectedWithItsOwnProjects(): void
+    {
+        $this->container['userModel']->update(['id' => $this->claude, 'role' => Role::APP_ADMIN]);
+        $this->actAs($this->claude);
+        $this->assertSame([$this->p1], $this->resolve()['project_ids']); // owner view, never beyond claude {P1,P3}
+        $this->assertSame([$this->p1, $this->p3], $this->resolve($this->member)['project_ids']); // admin's all ∩ claude
+    }
+
     public function testUserWithNoProjectsGetsAnEmptySet(): void
     {
         $loner = $this->user('loner');
