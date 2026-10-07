@@ -94,6 +94,11 @@ class WipView extends Base
 
         $rows = [];
         $fixer = new WipFixService($this->container);
+        if ($owner === null) {
+            // The caller's own view: its scope is the fixer's caller scope, so resolve it once. A narrower
+            // `scope` only trims owner_ids to rows this view shows anyway, so the owner guard agrees.
+            $fixer->seedCallerScope($s);
+        }
         $assignable = [];
         foreach ($this->facts($s, $columns, $now - $lookback * 86400) as $f) {
             $ev = WipFlagRules::evaluate($f, $cat, $now, $lookback, $cat->available());

@@ -82,7 +82,7 @@ class WipFixService extends Base
         }
 
         if ($action === 'assign') {
-            $candidates = $this->callerAssignees($pid);
+            $candidates = $this->callerAssignees($pid, $scope);
             if (! isset($candidates[$assignee])) {
                 return self::no('invalid_assignee');
             }
@@ -183,14 +183,28 @@ class WipFixService extends Base
     /**
      * Who the current caller may assign a No-owner ticket on $projectId to: the set apply() checks,
      * and the one a row's hint must use whoever's view it is in. [] for the app token (it never writes).
+     * $scope, when the caller already resolved its own WipScope, seeds the memo (see seedCallerScope).
      * @return array<int, string> uid => username
      */
-    public function callerAssignees(int $projectId): array
+    public function callerAssignees(int $projectId, ?array $scope = null): array
     {
         if (! $this->userSession->isLogged()) {
             return [];
         }
+        if ($scope !== null) {
+            $this->seedCallerScope($scope);
+        }
         return $this->assignees($projectId, $this->callerScope());
+    }
+
+    /**
+     * Hand over a WipScope already resolved for the caller's own view (owner_user_id null), so it
+     * resolves once per request. Only its people, owner_ids, roster_agent_ids and caller_is_agent are
+     * read, none of which depend on project narrowing. A memo already set is kept.
+     */
+    public function seedCallerScope(array $scope): void
+    {
+        $this->callerScope ??= $scope;
     }
 
     /** The caller's own WipScope, resolved once per instance. Logged-in callers only (the app token has no own view). */
