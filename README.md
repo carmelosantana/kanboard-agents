@@ -43,6 +43,9 @@ project access via Kanboard's native project UI (owner adds the agent as a proje
 - Schema **v3** runs once on load: every task stamped `moved_by_kind=human` whose `moved_by_uid` is in
   the `agents` roster becomes `agent`. It repairs boards where the v2 back-fill ran before the roster
   was adopted (`adoptAgent`). `system` / uid-0 stamps and non-roster human stamps are left alone.
+- One-click buttons now reflect what the viewer may actually do: viewers, restricted roles, the app
+  token, and agents on their owner's tickets see a link instead. Adopting a user relabels their
+  earlier moves as agent moves.
 
 ## Requirements
 
