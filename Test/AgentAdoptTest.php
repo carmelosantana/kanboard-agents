@@ -4,6 +4,7 @@ require_once 'tests/units/Base.php';
 use KanboardTests\units\Base;
 use Kanboard\Plugin\Agents\Api\AgentsRosterProcedure;
 use Kanboard\Plugin\Agents\Model\AgentTable;
+use Kanboard\Plugin\Agents\Subscriber\MoveProvenanceSubscriber;
 
 class AgentAdoptTest extends Base
 {
@@ -44,6 +45,47 @@ class AgentAdoptTest extends Base
         $r = $this->rpc()->adoptAgent($this->bot, $this->owner, 'claude');
         $this->assertSame(['ok' => true, 'agent_user_id' => $this->bot, 'owner_user_id' => $this->owner, 'kind' => 'claude'], $r);
         $this->assertTrue((new AgentTable($this->container))->isAgent($this->bot));
+    }
+
+    /** A task the bot moves while still an ordinary user: stamped human by the bot's uid. */
+    private function humanMoveBy(int $uid): int
+    {
+        (new MoveProvenanceSubscriber($this->container))->register();
+        $pid = $this->container['projectModel']->create(['name' => 'P']);
+        $tid = $this->container['taskCreationModel']->create(['project_id' => $pid, 'title' => 'T']);
+        $this->actAs($uid);
+        $this->container['taskStatusModel']->close($tid);
+        $this->assertSame('human', $this->container['taskMetadataModel']->get($tid, 'moved_by_kind'));
+        return $tid;
+    }
+
+    public function testAdoptRelabelsTheAgentsEarlierMoves(): void
+    {
+        $tid = $this->humanMoveBy($this->bot);
+        $this->actAs($this->admin);
+        $this->assertTrue($this->rpc()->adoptAgent($this->bot, $this->owner, 'claude')['ok']);
+        $this->assertSame('agent', $this->container['taskMetadataModel']->get($tid, 'moved_by_kind'));
+    }
+
+    public function testARelabelFailureDoesNotFailTheAdopt(): void
+    {
+        $this->container['db']->getConnection()->exec('DROP TABLE task_has_metadata');
+        $logger = $this->createMock(\Psr\Log\LoggerInterface::class);
+        $logger->expects($this->once())->method('error')->with($this->stringStartsWith('Agents adopt relabel: '));
+        unset($this->container['logger']);
+        $this->container['logger'] = $logger;
+        $this->actAs($this->admin);
+        $this->assertTrue($this->rpc()->adoptAgent($this->bot, $this->owner, 'claude')['ok']);
+        $this->assertTrue((new AgentTable($this->container))->isAgent($this->bot));
+    }
+
+    public function testRefusedAdoptRelabelsNothing(): void
+    {
+        $tid = $this->humanMoveBy($this->bot);
+        $this->actAs($this->admin);
+        (new AgentTable($this->container))->insert($this->admin, $this->owner, 'claude'); // carmelo is an agent: owner_is_agent
+        $this->assertSame('owner_is_agent', $this->rpc()->adoptAgent($this->bot, $this->owner, 'claude')['reason']);
+        $this->assertSame('human', $this->container['taskMetadataModel']->get($tid, 'moved_by_kind'));
     }
 
     public function testNumericStringParamsAreAccepted(): void

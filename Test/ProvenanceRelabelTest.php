@@ -83,6 +83,23 @@ class ProvenanceRelabelTest extends Base
         $this->assertSame(0, ProvenanceRelabel::run($this->pdo));
     }
 
+    public function testUidFilterRelabelsOnlyThatAgent(): void
+    {
+        $other = $this->container['userModel']->create(['username' => 'carmelo.codex', 'password' => 'x123456']);
+        $this->pdo->exec("INSERT INTO agents (owner_user_id, agent_user_id, kind, created_at) VALUES ($this->human, $other, 'codex', 0)");
+        $mine = $this->stamped($this->agent, 'human');
+        $theirs = $this->stamped($other, 'human');
+        $this->assertSame(1, ProvenanceRelabel::run($this->pdo, $this->agent));
+        $this->assertSame(['agent', 'human'], [$this->meta($mine)['moved_by_kind'], $this->meta($theirs)['moved_by_kind']]);
+    }
+
+    public function testUidFilterOnANonRosterUidRelabelsNothing(): void
+    {
+        $t = $this->stamped($this->human, 'human');
+        $this->assertSame(0, ProvenanceRelabel::run($this->pdo, $this->human));
+        $this->assertSame('human', $this->meta($t)['moved_by_kind']);
+    }
+
     public function testSchemaVersion3RunsRelabel(): void
     {
         $t = $this->stamped($this->agent, 'human');

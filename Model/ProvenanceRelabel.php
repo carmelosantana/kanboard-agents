@@ -7,13 +7,19 @@ namespace Kanboard\Plugin\Agents\Model;
 // roster uid becomes agent. system / uid-0 and non-roster human stamps are never touched.
 // The candidates are read first and updated by task_id: MySQL refuses an UPDATE whose subquery
 // reads the table being updated. Returns tasks relabelled; a second run returns 0.
+// $uid narrows the run to one roster uid (adoptAgent relabels the user it just adopted).
 class ProvenanceRelabel
 {
-    public static function run(\PDO $pdo): int
+    public static function run(\PDO $pdo, ?int $uid = null): int
     {
         $agents = [];
         foreach ($pdo->query('SELECT agent_user_id FROM agents') as $r) {
-            $agents[(int) $r['agent_user_id']] = true;
+            if ($uid === null || (int) $r['agent_user_id'] === $uid) {
+                $agents[(int) $r['agent_user_id']] = true;
+            }
+        }
+        if ($agents === []) {
+            return 0;
         }
         $human = [];
         foreach ($pdo->query("SELECT task_id FROM task_has_metadata WHERE name = 'moved_by_kind' AND value = 'human'") as $r) {
