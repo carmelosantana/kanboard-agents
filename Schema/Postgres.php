@@ -1,7 +1,7 @@
 <?php
 namespace Kanboard\Plugin\Agents\Schema;
 
-const VERSION = 2;
+const VERSION = 3;
 
 function version_1($pdo)
 {
@@ -18,4 +18,10 @@ function version_2($pdo)
 {
     require_once __DIR__.'/../Model/ProvenanceBackfill.php';
     \Kanboard\Plugin\Agents\Model\ProvenanceBackfill::run($pdo);
+}
+
+function version_3($pdo)
+{
+    require_once __DIR__.'/../Model/ProvenanceRelabel.php';
+    \Kanboard\Plugin\Agents\Model\ProvenanceRelabel::run($pdo);
 }
