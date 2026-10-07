@@ -1,6 +1,6 @@
 #!/bin/bash
 # Runs Test/portability-probe.php against throwaway MariaDB + Postgres containers:
-# the flags probe on db "kanboard", the v1->v2 upgrade on db "kb_up". Needs Docker.
+# the flags probe on db "kanboard", the v1->v3 upgrade on db "kb_up". Needs Docker.
 # Usage: MARIA_IMAGE=mariadb:10.11 PG_IMAGE=postgres:16 Test/run-probe.sh
 MARIA_IMAGE=${MARIA_IMAGE:-mariadb:11.4}
 PG_IMAGE=${PG_IMAGE:-postgres:16}
@@ -20,6 +20,6 @@ run(){ # driver host user db mode
 for spec in "mysql wip-probe-maria root" "postgres wip-probe-pg postgres"; do set -- $spec
   echo "=== $1: flags probe"; run $1 $2 $3 kanboard flags
   echo "=== $1: seed v1";     run $1 $2 $3 kb_up seed-v1
-  echo "=== $1: upgrade v2";  run $1 $2 $3 kb_up upgrade
+  echo "=== $1: upgrade v3";  run $1 $2 $3 kb_up upgrade
 done
 docker stop wip-probe-maria wip-probe-pg >/dev/null; docker network rm wip-probe >/dev/null; echo cleaned

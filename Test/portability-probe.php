@@ -4,8 +4,9 @@
 //   php portability-probe.php            flags + fix on a fresh database; prints timings; "OK <driver>"
 //   php portability-probe.php seed-v1    a v1-schema database: core + agents table at v1, plugin NOT loaded,
 //                                        tasks moved by an agent and by a human (project_activities rows)
-//   php portability-probe.php upgrade    load the plugin at v2 on that database (Schema\version_2 runs
-//                                        ProvenanceBackfill) and check the stamps; "OK upgrade <driver>"
+//   php portability-probe.php upgrade    load the plugin at v3 on that database (Schema\version_2 runs
+//                                        ProvenanceBackfill, version_3 ProvenanceRelabel), check the stamps,
+//                                        then relabel a late-adopted agent's human stamp; "OK upgrade <driver>"
 // WIP_PROBE_SCALE (default 1000) extra tasks are added after the checks to time getWipFlags at scale.
 $mode = $argv[1] ?? 'flags';
 if ($mode === 'seed-v1') {
@@ -67,7 +68,7 @@ if ($mode === 'seed-v1') {
 }
 
 if ($mode === 'upgrade') {
-    // common.php has already run the loader: Schema\version_2 ran (or failed and was logged) by now.
+    // common.php has already run the loader: Schema\version_2 and version_3 ran (or failed and were logged) by now.
     $loaded = array_keys($c['pluginLoader']->getPlugins());
     $ver = (int) $c['db']->table('plugin_schema_versions')->eq('plugin', 'agents')->findOneColumn('version');
     $got = [];
@@ -85,7 +86,7 @@ if ($mode === 'upgrade') {
     echo json_encode(['plugin_loaded' => in_array('Agents', $loaded, true), 'agents_schema' => $ver, 'stamps' => $got]), "\n";
     $checks = [
         'loaded' => in_array('Agents', $loaded, true),
-        'schema' => $ver === 2,
+        'schema' => $ver === 3,
         'agent' => $got['moved-by-agent']['kind'] === 'agent' && $got['moved-by-agent']['uid'] === $agentUid && $got['moved-by-agent']['at'] === $actAt('moved-by-agent'),
         'human' => $got['moved-by-human']['kind'] === 'human' && $got['moved-by-human']['uid'] === $humanUid && $got['moved-by-human']['at'] === $actAt('moved-by-human'),
         'unmoved' => $got['never-moved'] === ['kind' => null, 'uid' => null, 'at' => null],
@@ -94,6 +95,19 @@ if ($mode === 'upgrade') {
         if (! $ok) {
             probe_fail('upgrade '.$name, $got);
         }
+    }
+    // v3 on this engine: a user stamped human, adopted into the roster afterwards, relabels to agent once.
+    $late = $u->create(['username' => 'late.agent', 'password' => 'x1234567', 'role' => 'app-user']);
+    $lateTask = (int) $c['db']->table('tasks')->eq('title', 'never-moved')->findOneColumn('id');
+    $c['taskMetadataModel']->save($lateTask, ['moved_by_uid' => (string) $late, 'moved_by_kind' => 'human', 'moved_at' => '1700000200']);
+    $pdo = $c['db']->getConnection();
+    $pdo->exec("INSERT INTO agents (owner_user_id, agent_user_id, kind, created_at) VALUES ((SELECT id FROM users WHERE username = 'carmelo'), $late, 'claude', 0)");
+    $first = \Kanboard\Plugin\Agents\Model\ProvenanceRelabel::run($pdo);
+    $second = \Kanboard\Plugin\Agents\Model\ProvenanceRelabel::run($pdo);
+    $kinds = array_map(fn ($t) => $c['taskMetadataModel']->get((int) $c['db']->table('tasks')->eq('title', $t)->findOneColumn('id'), 'moved_by_kind'), ['moved-by-agent', 'moved-by-human', 'never-moved']);
+    echo json_encode(['relabel' => [$first, $second], 'kinds' => $kinds]), "\n";
+    if ($first !== 1 || $second !== 0 || $kinds !== ['agent', 'human', 'agent']) {
+        probe_fail('upgrade relabel', ['relabel' => [$first, $second], 'kinds' => $kinds]);
     }
     echo 'OK upgrade '.DB_DRIVER."\n";
     exit(0);
