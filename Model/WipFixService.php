@@ -51,12 +51,7 @@ class WipFixService extends Base
         if ($scope['project_ids'] !== [$pid]) {
             return self::no('forbidden');
         }
-        $owner = (int) $task['owner_id'];
-        if ($owner !== 0 && ! in_array($owner, $scope['owner_ids'], true)) {
-            return self::no('forbidden');
-        }
-        // An agent caller may fix only agent-owned or unowned tickets.
-        if ($scope['caller_is_agent'] && $owner !== 0 && ! in_array($owner, $scope['roster_agent_ids'], true)) {
+        if (! self::mayFixOwner((int) $task['owner_id'], $scope)) {
             return self::no('forbidden');
         }
         // Read visibility is not write permission: a project-viewer (or non-member) never fixes.
@@ -134,7 +129,7 @@ class WipFixService extends Base
     /**
      * Can the current caller's one-click fix for a row's top flag succeed? The single guard behind
      * a row's fix.oneclick (WipView): the refusals apply() would otherwise return for it, using the
-     * same write predicates (mayWrite, mayChange). $fact is a WipView::fact(); $columns its WipQuery::columns().
+     * same guards (mayFixOwner, mayWrite, mayChange). $fact is a WipView::fact(); $columns its WipQuery::columns().
      */
     public function oneClickable(?string $flag, array $fact, bool $hasAssignee, WipCatalogue $cat, array $columns): bool
     {
@@ -150,9 +145,29 @@ class WipFixService extends Base
         if ($action === 'move_to_done' && $done === null) {
             return false;
         }
+        // The app token never writes; everyone else passes apply()'s ownership guard against their own scope.
+        if (! $this->userSession->isLogged() || ! self::mayFixOwner($fact['owner_id'], $this->callerScope())) {
+            return false;
+        }
         // Permissions depend only on (project, action, flag, source column): cached, as the badge runs this on every page.
         $key = $pid.':'.$action.':'.$flag.':'.$fact['column_id'];
         return $this->mayFix[$key] ??= $this->mayWrite($pid) && $this->mayChange($action, $flag, $pid, $fact['column_id'], $done);
+    }
+
+    /**
+     * apply()'s ownership guard, shared with oneClickable(): the ticket is unowned or owned by someone in
+     * the caller's own view (owner_ids); an agent caller additionally only fixes agent-owned tickets.
+     * $scope is the caller's own WipScope (owner_ids and roster_agent_ids do not depend on project narrowing).
+     */
+    private static function mayFixOwner(int $owner, array $scope): bool
+    {
+        if ($owner === 0) {
+            return true;
+        }
+        if (! in_array($owner, $scope['owner_ids'], true)) {
+            return false;
+        }
+        return ! $scope['caller_is_agent'] || in_array($owner, $scope['roster_agent_ids'], true);
     }
 
     private static function actionFor(string $flag): ?string
@@ -175,8 +190,13 @@ class WipFixService extends Base
         if (! $this->userSession->isLogged()) {
             return [];
         }
-        $this->callerScope ??= (new WipScope($this->container))->resolve(null, 'all', null);
-        return $this->assignees($projectId, $this->callerScope);
+        return $this->assignees($projectId, $this->callerScope());
+    }
+
+    /** The caller's own WipScope, resolved once per instance. Logged-in callers only (the app token has no own view). */
+    private function callerScope(): array
+    {
+        return $this->callerScope ??= (new WipScope($this->container))->resolve(null, 'all', null);
     }
 
     /**

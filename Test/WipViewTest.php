@@ -198,6 +198,30 @@ class WipViewTest extends Base
         $this->assertFalse((new AgentsWipProcedure($this->container))->applyWipFix($t, 'assign', $expected, $this->claude)['ok']);
     }
 
+    // oneclick agrees with applyWipFix's owner guards: an agent caller fixes only agent-owned or unowned tickets.
+    public function testAgentCallerSeesOneClickOnlyOnAgentOwnedRows(): void
+    {
+        $human = $this->closedOutsideDone();
+        $own = $this->task($this->pid, 'In progress', $this->claude);
+        $this->touch($own, ['is_active' => 0, 'date_completed' => $this->now - self::DAY]);
+        $this->actAs($this->claude);
+        $rows = array_column($this->rpc()['rows'], 'fix', 'task_id');
+        $this->assertSame(['mismatch', false], [$rows[$human]['action'], $rows[$human]['oneclick']]);
+        $this->assertSame(['mismatch', true], [$rows[$own]['action'], $rows[$own]['oneclick']]);
+    }
+
+    // An admin viewing another user's tickets sees no one-click on rows outside the admin's own scope.
+    public function testAdminViewingAnotherUserSeesNoOneClickOnTheirRows(): void
+    {
+        $t = $this->closedOutsideDone();
+        $admin = $this->user('boss', Role::APP_ADMIN);
+        $this->actAs($admin);
+        $rows = array_column($this->rpc($this->carmelo)['rows'], 'fix', 'task_id');
+        $this->assertSame(['mismatch', false], [$rows[$t]['action'], $rows[$t]['oneclick']]);
+        $expected = (int) $this->container['taskFinderModel']->getById($t)['date_modification'];
+        $this->assertSame('forbidden', (new AgentsWipProcedure($this->container))->applyWipFix($t, 'move_to_done', $expected)['reason']);
+    }
+
     public function testNoOwnerIsNotOneClickWhenNobodyIsAssignable(): void
     {
         $q = $this->project('Q', [$this->carmelo => Role::PROJECT_VIEWER, $this->claude => Role::PROJECT_VIEWER]);
