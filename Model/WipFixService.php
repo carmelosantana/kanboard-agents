@@ -14,6 +14,8 @@ class WipFixService extends Base
 
     /** oneClickable()'s permission memo: "pid:action:flag:column" => bool */
     private array $mayFix = [];
+    /** callerAssignees()' memo: the caller's own WipScope */
+    private ?array $callerScope = null;
 
     /**
      * @return array{ok: true, task_id: int, action: string, comment_id: int}
@@ -85,7 +87,7 @@ class WipFixService extends Base
         }
 
         if ($action === 'assign') {
-            $candidates = $this->assignees($pid, $scope);
+            $candidates = $this->callerAssignees($pid);
             if (! isset($candidates[$assignee])) {
                 return self::no('invalid_assignee');
             }
@@ -161,6 +163,20 @@ class WipFixService extends Base
             }
         }
         return null;
+    }
+
+    /**
+     * Who the current caller may assign a No-owner ticket on $projectId to: the set apply() checks,
+     * and the one a row's hint must use whoever's view it is in. [] for the app token (it never writes).
+     * @return array<int, string> uid => username
+     */
+    public function callerAssignees(int $projectId): array
+    {
+        if (! $this->userSession->isLogged()) {
+            return [];
+        }
+        $this->callerScope ??= (new WipScope($this->container))->resolve(null, 'all', null);
+        return $this->assignees($projectId, $this->callerScope);
     }
 
     /**

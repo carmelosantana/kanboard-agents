@@ -112,7 +112,7 @@ class WipView extends Base
             }
             $hasAssignee = false;
             if ($ev['fix'] === 'noowner') {
-                $assignable[$f['project_id']] ??= $fixer->assignees($f['project_id'], $s) !== [];
+                $assignable[$f['project_id']] ??= $fixer->callerAssignees($f['project_id']) !== [];
                 $hasAssignee = $assignable[$f['project_id']];
             }
             $rows[] = $this->row($f, $ev, $cat, $s, $fixer->oneClickable($ev['fix'], $f, $hasAssignee, $cat, $columns));

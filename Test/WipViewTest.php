@@ -186,6 +186,18 @@ class WipViewTest extends Base
         $this->assertSame(['noowner', false], [$rows[$t]['action'], $rows[$t]['oneclick']]);
     }
 
+    // N3: the No-owner hint uses the caller's own assignable set, the one applyWipFix checks, not the viewed owner's.
+    public function testNoOwnerHintUsesTheCallersAssigneesNotTheViewedOwners(): void
+    {
+        $t = $this->task($this->pid, 'In progress');
+        $admin = $this->user('boss', Role::APP_ADMIN); // no agents, not a member: nobody it may assign
+        $this->actAs($admin);
+        $rows = array_column($this->rpc($this->carmelo)['rows'], 'fix', 'task_id');
+        $this->assertSame(['noowner', false], [$rows[$t]['action'], $rows[$t]['oneclick']]);
+        $expected = (int) $this->container['taskFinderModel']->getById($t)['date_modification'];
+        $this->assertFalse((new AgentsWipProcedure($this->container))->applyWipFix($t, 'assign', $expected, $this->claude)['ok']);
+    }
+
     public function testNoOwnerIsNotOneClickWhenNobodyIsAssignable(): void
     {
         $q = $this->project('Q', [$this->carmelo => Role::PROJECT_VIEWER, $this->claude => Role::PROJECT_VIEWER]);

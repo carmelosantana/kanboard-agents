@@ -28,7 +28,7 @@ class WipController extends BaseController
         $assignees = [];
         foreach ($env['rows'] as $r) {
             if ($r['fix']['action'] === 'noowner' && ! isset($assignees[$r['project_id']])) {
-                $assignees[$r['project_id']] = $fix->assignees($r['project_id'], $scope);
+                $assignees[$r['project_id']] = $fix->callerAssignees($r['project_id']);
             }
         }
 
