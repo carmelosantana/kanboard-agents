@@ -70,6 +70,13 @@ class AgentProvisioner extends Base
         if (! $roster->adopt($ownerUserId, $agentUserId, $kind)) {
             return ['ok' => false, 'reason' => 'duplicate'];
         }
+        // Moves this user made before adoption were stamped human: they are agent moves now.
+        // Best effort: the adoption stands even if the relabel fails.
+        try {
+            ProvenanceRelabel::run($this->db->getConnection(), $agentUserId);
+        } catch (\Throwable $e) {
+            $this->logger->error('Agents adopt relabel: '.$e->getMessage());
+        }
         return ['ok' => true, 'agent_user_id' => $agentUserId, 'owner_user_id' => $ownerUserId, 'kind' => $kind];
     }
 

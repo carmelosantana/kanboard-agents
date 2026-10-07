@@ -6,6 +6,11 @@ use KanboardTests\units\Base;
 use Kanboard\Core\Security\Role;
 use Kanboard\Model\ProjectRoleRestrictionModel;
 use Kanboard\Plugin\Agents\Api\AgentsWipProcedure;
+use Kanboard\Plugin\Agents\Model\WipCatalogue;
+use Kanboard\Plugin\Agents\Model\WipFixService;
+use Kanboard\Plugin\Agents\Model\WipQuery;
+use Kanboard\Plugin\Agents\Model\WipScope;
+use Kanboard\Plugin\Agents\Model\WipView;
 use Kanboard\Plugin\Agents\Subscriber\MoveProvenanceSubscriber;
 
 class WipFixServiceTest extends Base
@@ -238,6 +243,31 @@ class WipFixServiceTest extends Base
         $this->assertSame('forbidden', $this->fix($human, 'move_to_done')['reason']);
         $this->assertTrue($this->fix($agents, 'move_to_done')['ok']);
         $this->assertSame('🧭 WIP view: Move to Done (Closed, not in Done) by carmelo.claude', $this->lastComment($agents));
+    }
+
+    // The caller's scope resolves once per request: a pre-resolved scope seeds the memo and later calls reuse it.
+    public function testCallerAssigneesSeedsAndReusesThePassedScope(): void
+    {
+        $scope = (new WipScope($this->container))->resolve(null, 'all', null);
+        unset($scope['people'][$this->carmelo]); // a marker: a fresh resolve would include carmelo
+        $fixer = new WipFixService($this->container);
+        $this->assertSame([$this->claude => 'carmelo.claude'], $fixer->callerAssignees($this->pid, $scope));
+        $this->assertSame([$this->claude => 'carmelo.claude'], $fixer->callerAssignees($this->pid));
+    }
+
+    public function testOneClickableUsesTheSeededCallerScope(): void
+    {
+        $t = $this->closedOutsideDone($this->carmelo);
+        $columns = (new WipQuery($this->container))->columns([$this->pid]);
+        $fact = WipView::fact($this->task_($t) + ['project_name' => 'P', 'last_comment' => null, 'sub_total' => 0, 'sub_done' => 0, 'sub_prog' => 0],
+            $columns, ['roster_agent_ids' => [$this->claude], 'agent_projects' => [$this->pid]], [], []);
+        $fixer = new WipFixService($this->container);
+        $this->assertTrue($fixer->oneClickable('mismatch', $fact, false, new WipCatalogue(), $columns));
+        $scope = (new WipScope($this->container))->resolve(null, 'all', null);
+        $scope['owner_ids'] = []; // a marker: carmelo's own row is out of this seeded scope
+        $seeded = new WipFixService($this->container);
+        $seeded->seedCallerScope($scope);
+        $this->assertFalse($seeded->oneClickable('mismatch', $fact, false, new WipCatalogue(), $columns));
     }
 
     public function testMalformedInputThrowsInvalidArgument(): void

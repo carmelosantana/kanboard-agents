@@ -12,6 +12,11 @@ class WipFixService extends Base
     /** action => the flags that justify it */
     const ACTIONS = ['move_to_done' => ['donesubs', 'mismatch'], 'assign' => ['noowner']];
 
+    /** oneClickable()'s permission memo: "pid:action:flag:column" => bool */
+    private array $mayFix = [];
+    /** callerAssignees()' memo: the caller's own WipScope */
+    private ?array $callerScope = null;
+
     /**
      * @return array{ok: true, task_id: int, action: string, comment_id: int}
      *       | array{ok: false, reason: 'changed'|'not_flagged'|'forbidden'|'hold'|'invalid_assignee'|'no_done_column'}
@@ -46,12 +51,7 @@ class WipFixService extends Base
         if ($scope['project_ids'] !== [$pid]) {
             return self::no('forbidden');
         }
-        $owner = (int) $task['owner_id'];
-        if ($owner !== 0 && ! in_array($owner, $scope['owner_ids'], true)) {
-            return self::no('forbidden');
-        }
-        // An agent caller may fix only agent-owned or unowned tickets.
-        if ($scope['caller_is_agent'] && $owner !== 0 && ! in_array($owner, $scope['roster_agent_ids'], true)) {
+        if (! self::mayFixOwner((int) $task['owner_id'], $scope)) {
             return self::no('forbidden');
         }
         // Read visibility is not write permission: a project-viewer (or non-member) never fixes.
@@ -82,11 +82,11 @@ class WipFixService extends Base
         }
 
         if ($action === 'assign') {
-            $candidates = $this->assignees($pid, $scope);
+            $candidates = $this->callerAssignees($pid, $scope);
             if (! isset($candidates[$assignee])) {
                 return self::no('invalid_assignee');
             }
-            if (! $this->helper->projectRole->canChangeAssignee($task)) {
+            if (! $this->mayChange('assign', $flag, $pid, (int) $task['column_id'], null)) {
                 return self::no('forbidden');
             }
             $this->taskModificationModel->update(['id' => $taskId, 'owner_id' => $assignee]);
@@ -96,9 +96,7 @@ class WipFixService extends Base
                 return self::no('no_done_column');
             }
             $done = $columns[$pid]['done'][0];
-            // Custom project roles: core's own move/close restriction checks, as its controllers use them.
-            if (! $this->helper->projectRole->canMoveTask($pid, (int) $task['column_id'], $done)
-                || ($flag === 'donesubs' && ! $this->helper->projectRole->canChangeTaskStatusInColumn($pid, $done))) {
+            if (! $this->mayChange('move_to_done', $flag, $pid, (int) $task['column_id'], $done)) {
                 return self::no('forbidden');
             }
             $swimlane = (int) $task['swimlane_id'];
@@ -129,20 +127,90 @@ class WipFixService extends Base
     }
 
     /**
-     * Can the one-click fix for a row's top flag succeed? The single guard behind a row's
-     * fix.oneclick (WipView) and the refusals apply() would otherwise return for it.
+     * Can the current caller's one-click fix for a row's top flag succeed? The single guard behind
+     * a row's fix.oneclick (WipView): the refusals apply() would otherwise return for it, using the
+     * same guards (mayFixOwner, mayWrite, mayChange). $fact is a WipView::fact(); $columns its WipQuery::columns().
      */
-    public static function oneClickable(?string $flag, array $tags, bool $hasAssignee, WipCatalogue $cat): bool
+    public function oneClickable(?string $flag, array $fact, bool $hasAssignee, WipCatalogue $cat, array $columns): bool
     {
         if ($flag === null || ! $cat->flag($flag)['oneclick']) {
             return false;
         }
+        $action = self::actionFor($flag);
+        if ($action === null || ($action === 'assign' ? ! $hasAssignee : self::heldFromDone($fact['tags']))) {
+            return false;
+        }
+        $pid = $fact['project_id'];
+        $done = $columns[$pid]['done'][0] ?? null;
+        if ($action === 'move_to_done' && $done === null) {
+            return false;
+        }
+        // The app token never writes; everyone else passes apply()'s ownership guard against their own scope.
+        if (! $this->userSession->isLogged() || ! self::mayFixOwner($fact['owner_id'], $this->callerScope())) {
+            return false;
+        }
+        // Permissions depend only on (project, action, flag, source column): cached, as the badge runs this on every page.
+        $key = $pid.':'.$action.':'.$flag.':'.$fact['column_id'];
+        return $this->mayFix[$key] ??= $this->mayWrite($pid) && $this->mayChange($action, $flag, $pid, $fact['column_id'], $done);
+    }
+
+    /**
+     * apply()'s ownership guard, shared with oneClickable(): the ticket is unowned or owned by someone in
+     * the caller's own view (owner_ids); an agent caller additionally only fixes agent-owned tickets.
+     * $scope is the caller's own WipScope (owner_ids and roster_agent_ids do not depend on project narrowing).
+     */
+    private static function mayFixOwner(int $owner, array $scope): bool
+    {
+        if ($owner === 0) {
+            return true;
+        }
+        if (! in_array($owner, $scope['owner_ids'], true)) {
+            return false;
+        }
+        return ! $scope['caller_is_agent'] || in_array($owner, $scope['roster_agent_ids'], true);
+    }
+
+    private static function actionFor(string $flag): ?string
+    {
         foreach (self::ACTIONS as $action => $flags) {
             if (in_array($flag, $flags, true)) {
-                return $action === 'assign' ? $hasAssignee : ! self::heldFromDone($tags);
+                return $action;
             }
         }
-        return false;
+        return null;
+    }
+
+    /**
+     * Who the current caller may assign a No-owner ticket on $projectId to: the set apply() checks,
+     * and the one a row's hint must use whoever's view it is in. [] for the app token (it never writes).
+     * $scope, when the caller already resolved its own WipScope, seeds the memo (see seedCallerScope).
+     * @return array<int, string> uid => username
+     */
+    public function callerAssignees(int $projectId, ?array $scope = null): array
+    {
+        if (! $this->userSession->isLogged()) {
+            return [];
+        }
+        if ($scope !== null) {
+            $this->seedCallerScope($scope);
+        }
+        return $this->assignees($projectId, $this->callerScope());
+    }
+
+    /**
+     * Hand over a WipScope already resolved for the caller's own view (owner_user_id null), so it
+     * resolves once per request. Only its people, owner_ids, roster_agent_ids and caller_is_agent are
+     * read, none of which depend on project narrowing. A memo already set is kept.
+     */
+    public function seedCallerScope(array $scope): void
+    {
+        $this->callerScope ??= $scope;
+    }
+
+    /** The caller's own WipScope, resolved once per instance. Logged-in callers only (the app token has no own view). */
+    private function callerScope(): array
+    {
+        return $this->callerScope ??= (new WipScope($this->container))->resolve(null, 'all', null);
     }
 
     /**
@@ -160,6 +228,21 @@ class WipFixService extends Base
         return $out;
     }
 
+    /**
+     * Custom project roles: core's own assignee / move / close restriction checks, as its controllers
+     * use them. $done is the target Done column (move_to_done only).
+     */
+    private function mayChange(string $action, string $flag, int $projectId, int $srcColumnId, ?int $done): bool
+    {
+        $role = $this->helper->projectRole;
+        if ($action === 'assign') {
+            return $role->canChangeAssignee(['project_id' => $projectId]);
+        }
+        return $role->canMoveTask($projectId, $srcColumnId, $done)
+            && ($flag !== 'donesubs' || $role->canChangeTaskStatusInColumn($projectId, $done));
+    }
+
+    /** Read visibility is not write permission: app-admin, or a project role other than viewer. */
     private function mayWrite(int $projectId): bool
     {
         if ($this->userSession->isAdmin()) {
