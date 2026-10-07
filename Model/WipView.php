@@ -115,7 +115,7 @@ class WipView extends Base
                 $assignable[$f['project_id']] ??= $fixer->callerAssignees($f['project_id']) !== [];
                 $hasAssignee = $assignable[$f['project_id']];
             }
-            $rows[] = $this->row($f, $ev, $cat, $s, $fixer->oneClickable($ev['fix'], $f, $hasAssignee, $cat, $columns));
+            $rows[] = $this->row($f, $ev, $s, $fixer->oneClickable($ev['fix'], $f, $hasAssignee, $cat, $columns));
         }
 
         $env['rows'] = array_map(function ($r) {
@@ -209,7 +209,7 @@ class WipView extends Base
         return in_array($f['owner_id'], $scope['owner_ids'], true);
     }
 
-    private function row(array $f, array $ev, WipCatalogue $cat, array $scope, bool $oneClickable): array
+    private function row(array $f, array $ev, array $scope, bool $oneClickable): array
     {
         $loc = self::location($f['meta']);
         $person = $scope['people'][$f['owner_id']] ?? null;
