@@ -4,6 +4,7 @@ require_once __DIR__.'/WipFixture.php';
 
 use KanboardTests\units\Base;
 use Kanboard\Core\Security\Role;
+use Kanboard\Model\ProjectRoleRestrictionModel;
 use Kanboard\Plugin\Agents\Api\AgentsWipProcedure;
 use Kanboard\Plugin\Agents\Model\WipCatalogue;
 use Kanboard\Plugin\Agents\Model\WipFlagRules;
@@ -128,6 +129,61 @@ class WipViewTest extends Base
         $rows = array_column($this->rpc()['rows'], 'fix', 'task_id');
         $this->assertSame(['mismatch', false], [$rows[$held]['action'], $rows[$held]['oneclick']]);
         $this->assertSame(['donesubs', false], [$rows[$map]['action'], $rows[$map]['oneclick']]);
+    }
+
+    private function closedOutsideDone(): int
+    {
+        $t = $this->task($this->pid, 'In progress', $this->carmelo);
+        $this->touch($t, ['is_active' => 0, 'date_completed' => $this->now - self::DAY]);
+        return $t;
+    }
+
+    private function restrictedRole(string $name, string $rule): void
+    {
+        $roleId = $this->container['projectRoleModel']->create($this->pid, $name);
+        $this->container['projectRoleRestrictionModel']->create($this->pid, $roleId, $rule);
+        $this->container['projectUserRoleModel']->changeUserRole($this->pid, $this->carmelo, $name);
+    }
+
+    // N1: oneclick is false wherever applyWipFix would refuse the caller with `forbidden`.
+    public function testMemberSeesMoveToDoneAsOneClick(): void
+    {
+        $t = $this->closedOutsideDone();
+        $rows = array_column($this->rpc()['rows'], 'fix', 'task_id');
+        $this->assertSame(['mismatch', true], [$rows[$t]['action'], $rows[$t]['oneclick']]);
+    }
+
+    public function testProjectViewerNeverSeesOneClick(): void
+    {
+        $t = $this->closedOutsideDone();
+        $this->container['projectUserRoleModel']->changeUserRole($this->pid, $this->carmelo, Role::PROJECT_VIEWER);
+        $rows = array_column($this->rpc()['rows'], 'fix', 'task_id');
+        $this->assertSame(['mismatch', false], [$rows[$t]['action'], $rows[$t]['oneclick']]);
+    }
+
+    public function testCustomRoleMoveRestrictionTurnsOneClickOff(): void
+    {
+        $t = $this->closedOutsideDone();
+        $this->restrictedRole('no-move', ProjectRoleRestrictionModel::RULE_TASK_MOVE);
+        $rows = array_column($this->rpc()['rows'], 'fix', 'task_id');
+        $this->assertSame(['mismatch', false], [$rows[$t]['action'], $rows[$t]['oneclick']]);
+    }
+
+    public function testCustomRoleCloseRestrictionTurnsDoneSubtasksOneClickOff(): void
+    {
+        $t = $this->task($this->pid, 'In progress', $this->carmelo);
+        $this->subtask($t, 'a', 2);
+        $this->restrictedRole('no-close', ProjectRoleRestrictionModel::RULE_TASK_OPEN_CLOSE);
+        $rows = array_column($this->rpc()['rows'], 'fix', 'task_id');
+        $this->assertSame(['donesubs', false], [$rows[$t]['action'], $rows[$t]['oneclick']]);
+    }
+
+    public function testCustomRoleAssigneeRestrictionTurnsNoOwnerOneClickOff(): void
+    {
+        $t = $this->task($this->pid, 'In progress');
+        $this->restrictedRole('no-assign', ProjectRoleRestrictionModel::RULE_TASK_CHANGE_ASSIGNEE);
+        $rows = array_column($this->rpc()['rows'], 'fix', 'task_id');
+        $this->assertSame(['noowner', false], [$rows[$t]['action'], $rows[$t]['oneclick']]);
     }
 
     public function testNoOwnerIsNotOneClickWhenNobodyIsAssignable(): void

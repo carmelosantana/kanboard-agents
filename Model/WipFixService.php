@@ -12,6 +12,9 @@ class WipFixService extends Base
     /** action => the flags that justify it */
     const ACTIONS = ['move_to_done' => ['donesubs', 'mismatch'], 'assign' => ['noowner']];
 
+    /** oneClickable()'s permission memo: "pid:action:flag:column" => bool */
+    private array $mayFix = [];
+
     /**
      * @return array{ok: true, task_id: int, action: string, comment_id: int}
      *       | array{ok: false, reason: 'changed'|'not_flagged'|'forbidden'|'hold'|'invalid_assignee'|'no_done_column'}
@@ -86,7 +89,7 @@ class WipFixService extends Base
             if (! isset($candidates[$assignee])) {
                 return self::no('invalid_assignee');
             }
-            if (! $this->helper->projectRole->canChangeAssignee($task)) {
+            if (! $this->mayChange('assign', $flag, $pid, (int) $task['column_id'], null)) {
                 return self::no('forbidden');
             }
             $this->taskModificationModel->update(['id' => $taskId, 'owner_id' => $assignee]);
@@ -96,9 +99,7 @@ class WipFixService extends Base
                 return self::no('no_done_column');
             }
             $done = $columns[$pid]['done'][0];
-            // Custom project roles: core's own move/close restriction checks, as its controllers use them.
-            if (! $this->helper->projectRole->canMoveTask($pid, (int) $task['column_id'], $done)
-                || ($flag === 'donesubs' && ! $this->helper->projectRole->canChangeTaskStatusInColumn($pid, $done))) {
+            if (! $this->mayChange('move_to_done', $flag, $pid, (int) $task['column_id'], $done)) {
                 return self::no('forbidden');
             }
             $swimlane = (int) $task['swimlane_id'];
@@ -129,20 +130,37 @@ class WipFixService extends Base
     }
 
     /**
-     * Can the one-click fix for a row's top flag succeed? The single guard behind a row's
-     * fix.oneclick (WipView) and the refusals apply() would otherwise return for it.
+     * Can the current caller's one-click fix for a row's top flag succeed? The single guard behind
+     * a row's fix.oneclick (WipView): the refusals apply() would otherwise return for it, using the
+     * same write predicates (mayWrite, mayChange). $fact is a WipView::fact(); $columns its WipQuery::columns().
      */
-    public static function oneClickable(?string $flag, array $tags, bool $hasAssignee, WipCatalogue $cat): bool
+    public function oneClickable(?string $flag, array $fact, bool $hasAssignee, WipCatalogue $cat, array $columns): bool
     {
         if ($flag === null || ! $cat->flag($flag)['oneclick']) {
             return false;
         }
+        $action = self::actionFor($flag);
+        if ($action === null || ($action === 'assign' ? ! $hasAssignee : self::heldFromDone($fact['tags']))) {
+            return false;
+        }
+        $pid = $fact['project_id'];
+        $done = $columns[$pid]['done'][0] ?? null;
+        if ($action === 'move_to_done' && $done === null) {
+            return false;
+        }
+        // Permissions depend only on (project, action, flag, source column): cached, as the badge runs this on every page.
+        $key = $pid.':'.$action.':'.$flag.':'.$fact['column_id'];
+        return $this->mayFix[$key] ??= $this->mayWrite($pid) && $this->mayChange($action, $flag, $pid, $fact['column_id'], $done);
+    }
+
+    private static function actionFor(string $flag): ?string
+    {
         foreach (self::ACTIONS as $action => $flags) {
             if (in_array($flag, $flags, true)) {
-                return $action === 'assign' ? $hasAssignee : ! self::heldFromDone($tags);
+                return $action;
             }
         }
-        return false;
+        return null;
     }
 
     /**
@@ -160,6 +178,21 @@ class WipFixService extends Base
         return $out;
     }
 
+    /**
+     * Custom project roles: core's own assignee / move / close restriction checks, as its controllers
+     * use them. $done is the target Done column (move_to_done only).
+     */
+    private function mayChange(string $action, string $flag, int $projectId, int $srcColumnId, ?int $done): bool
+    {
+        $role = $this->helper->projectRole;
+        if ($action === 'assign') {
+            return $role->canChangeAssignee(['project_id' => $projectId]);
+        }
+        return $role->canMoveTask($projectId, $srcColumnId, $done)
+            && ($flag !== 'donesubs' || $role->canChangeTaskStatusInColumn($projectId, $done));
+    }
+
+    /** Read visibility is not write permission: app-admin, or a project role other than viewer. */
     private function mayWrite(int $projectId): bool
     {
         if ($this->userSession->isAdmin()) {

@@ -115,7 +115,7 @@ class WipView extends Base
                 $assignable[$f['project_id']] ??= $fixer->assignees($f['project_id'], $s) !== [];
                 $hasAssignee = $assignable[$f['project_id']];
             }
-            $rows[] = $this->row($f, $ev, $cat, $s, $hasAssignee);
+            $rows[] = $this->row($f, $ev, $cat, $s, $fixer->oneClickable($ev['fix'], $f, $hasAssignee, $cat, $columns));
         }
 
         $env['rows'] = array_map(function ($r) {
@@ -165,6 +165,7 @@ class WipView extends Base
             'title' => $t['title'],
             'project_id' => $pid,
             'project_name' => $t['project_name'],
+            'column_id' => (int) $t['column_id'],
             'column_title' => $title,
             'is_active' => (int) $t['is_active'],
             'role' => WipQuery::role($title),
@@ -208,7 +209,7 @@ class WipView extends Base
         return in_array($f['owner_id'], $scope['owner_ids'], true);
     }
 
-    private function row(array $f, array $ev, WipCatalogue $cat, array $scope, bool $hasAssignee): array
+    private function row(array $f, array $ev, WipCatalogue $cat, array $scope, bool $oneClickable): array
     {
         $loc = self::location($f['meta']);
         $person = $scope['people'][$f['owner_id']] ?? null;
@@ -230,7 +231,7 @@ class WipView extends Base
             'fix' => [
                 // Decision 14: a disabled owner's ticket needs a new owner first: Assign, as a link.
                 'action' => $disabled ? 'assign' : $ev['fix'],
-                'oneclick' => ! $disabled && WipFixService::oneClickable($ev['fix'], $f['tags'], $hasAssignee, $cat),
+                'oneclick' => ! $disabled && $oneClickable,
                 'url' => '/task/'.$f['task_id'],
                 'location' => $loc,
             ],
