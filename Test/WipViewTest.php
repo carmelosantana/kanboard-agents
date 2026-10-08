@@ -263,6 +263,40 @@ class WipViewTest extends Base
         $this->assertSame([['mismatch']], array_column($this->rpc(null, 'all', null, false, 60)['rows'], 'flags'));
     }
 
+    /** An agent-owned ticket closed in the Done column 2 days ago; `$meta` is saved as task metadata. */
+    private function closedInDone(array $meta): int
+    {
+        $t = $this->task($this->pid, 'Done', $this->claude);
+        if ($meta !== []) {
+            $this->container['taskMetadataModel']->save($t, $meta);
+        }
+        $at = $this->now - 2 * self::DAY;
+        $this->touch($t, ['is_active' => 0, 'date_completed' => $at, 'date_moved' => $at, 'date_modification' => $at]);
+        return $t;
+    }
+
+    public function testTimemissOnATicketClosedInDone(): void
+    {
+        $t = $this->closedInDone(['loc_session_id' => 'sess-1']);
+        $env = $this->rpc();
+        $this->assertSame([[$t, ['timemiss']]], array_map(fn ($r) => [$r['task_id'], $r['flags']], $env['rows']));
+        $this->assertSame(1, $env['summary']['timemiss']);
+    }
+
+    public function testClosedInDoneWithAFreshStampHasNoRow(): void
+    {
+        $this->closedInDone(['loc_session_id' => 'sess-1', 'time_backfilled_at' => (string) $this->now]);
+        $env = $this->rpc();
+        $this->assertSame([], $env['rows']);
+        $this->assertSame(0, $env['summary']['timemiss']);
+    }
+
+    public function testClosedInDoneWithoutALocationIsNotReturned(): void
+    {
+        $this->closedInDone([]);
+        $this->assertSame([], $this->rpc()['rows']);
+    }
+
     public function testEmptyProjectSetReturnsEarlyWithNoRows(): void
     {
         // A user with no projects must not see the instance (PicoDb in([]) would return every task).

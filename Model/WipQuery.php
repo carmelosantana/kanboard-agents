@@ -55,15 +55,21 @@ class WipQuery extends Base
         return $out;
     }
 
-    /** Open tasks, plus tasks closed outside Done since $closedSince. One row per task. */
+    /**
+     * Open tasks, plus tasks closed since $closedSince that sit outside Done (mismatch) or sit in Done
+     * with a non-empty `loc_session_id` (timemiss). One row per task. The EXISTS probe is the one
+     * correlated subquery: it runs only for closed rows inside the lookback, on the metadata primary key.
+     */
     public function tasks(array $projectIds, array $doneColumnIds, int $closedSince, ?int $taskId = null): array
     {
         $this->guard($projectIds);
         $closed = 't.date_completed >= ?';
         $closedParams = [$closedSince];
         if ($doneColumnIds !== []) {
-            $closed .= ' AND t.column_id NOT IN ('.$this->marks($doneColumnIds).')';
-            $closedParams = array_merge($closedParams, array_map('intval', $doneColumnIds));
+            $closed .= ' AND (t.column_id NOT IN ('.$this->marks($doneColumnIds).')
+                         OR EXISTS (SELECT 1 FROM task_has_metadata lm
+                                     WHERE lm.task_id = t.id AND lm.name = ? AND lm.value <> ?))';
+            $closedParams = array_merge($closedParams, array_map('intval', $doneColumnIds), ['loc_session_id', '']);
         }
         $sql = 'SELECT t.id, t.title, t.project_id, prj.name AS project_name, t.column_id, t.owner_id, t.is_active,
                        t.date_moved, t.date_modification, t.date_completed,
