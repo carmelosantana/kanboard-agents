@@ -31,4 +31,21 @@ class AgentTableTest extends Base
         $this->assertSame(1, (int) $row['owner_user_id']);
         $this->assertNull($t->getByAgent(999));
     }
+
+    public function testAgentIdsReturnsRosterSubset(): void
+    {
+        $t = new \Kanboard\Plugin\Agents\Model\AgentTable($this->container);
+        $t->insert(1, 2, 'claude');
+        $t->insert(1, 3, 'codex');
+
+        $ids = $t->agentIds([1, 2, 3, 4, 2, '3']);
+        sort($ids);
+        $this->assertSame([2, 3], $ids);
+    }
+
+    public function testAgentIdsEmptyInputSkipsQuery(): void
+    {
+        $t = new \Kanboard\Plugin\Agents\Model\AgentTable($this->container);
+        $this->assertSame([], $t->agentIds([]));
+    }
 }

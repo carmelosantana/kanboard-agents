@@ -46,4 +46,15 @@ class AgentTable extends Base
     {
         return $userId > 0 && $this->getByAgent($userId) !== null;
     }
+
+    // Batch roster lookup for callers that must not read this table directly (Presence).
+    public function agentIds(array $userIds): array
+    {
+        $userIds = array_values(array_unique(array_map('intval', $userIds)));
+        if ($userIds === []) {
+            return [];
+        }
+        $ids = $this->db->table(self::TABLE)->in('agent_user_id', $userIds)->findAllByColumn('agent_user_id');
+        return array_map('intval', $ids);
+    }
 }
