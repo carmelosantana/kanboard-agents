@@ -116,4 +116,58 @@ class AgentProcedureTest extends Base
         $this->assertSame($this->owner, $r['agents'][0]['owner_user_id']);
         $this->assertCount(2, $this->rpc()->getAgents(0)['agents']);
     }
+
+    /** Inject one failure, create, assert nothing was left, remove it, and prove a retry gets the name (#6072). */
+    private function assertCreateLeavesNothing(string $inject, string $remove): void
+    {
+        $this->actAs($this->admin);
+        $pdo = $this->container['db']->getConnection();
+        $users = $this->container['db']->table('users')->count();
+        $pdo->exec($inject);
+        $r = $this->rpc()->createAgent($this->owner, 'codex', '');
+        $pdo->exec($remove);
+        $this->assertSame(['ok' => false, 'reason' => 'create_failed'], $r);
+        $this->assertEmpty($this->container['userModel']->getByUsername('carmelo.codex'));
+        $this->assertSame($users, $this->container['db']->table('users')->count());
+        $this->assertSame(0, $this->container['db']->table('users')->neq('api_access_token', '')->notNull('api_access_token')->count());
+        $this->assertSame([], (new AgentTable($this->container))->getAll());
+
+        $retry = $this->rpc()->createAgent($this->owner, 'codex', '');
+        $this->assertTrue($retry['ok']);
+        $this->assertSame('carmelo.codex', $retry['username']);
+    }
+
+    public function testUserInsertFailureLeavesNothing(): void
+    {
+        $this->assertCreateLeavesNothing(
+            "CREATE TRIGGER t BEFORE INSERT ON users WHEN NEW.username = 'carmelo.codex' BEGIN SELECT RAISE(ABORT, 'injected'); END",
+            'DROP TRIGGER t'
+        );
+    }
+
+    public function testTokenWriteFailureLeavesNothing(): void
+    {
+        $this->assertCreateLeavesNothing(
+            "CREATE TRIGGER t BEFORE UPDATE OF api_access_token ON users BEGIN SELECT RAISE(ABORT, 'injected'); END",
+            'DROP TRIGGER t'
+        );
+    }
+
+    public function testRosterInsertFailureLeavesNothing(): void
+    {
+        $this->assertCreateLeavesNothing(
+            "CREATE TRIGGER t BEFORE INSERT ON agents BEGIN SELECT RAISE(ABORT, 'injected'); END",
+            'DROP TRIGGER t'
+        );
+    }
+
+    public function testRosterInsertExceptionLeavesNothing(): void
+    {
+        // Renaming the whole table would trip createForApi's isAgent() check before create() runs, so break
+        // only the column the roster insert writes: "no column named created_at" is HY000, so SQLException.
+        $this->assertCreateLeavesNothing(
+            'ALTER TABLE agents RENAME COLUMN created_at TO created_off',
+            'ALTER TABLE agents RENAME COLUMN created_off TO created_at'
+        );
+    }
 }

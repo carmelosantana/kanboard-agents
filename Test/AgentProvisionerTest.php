@@ -72,4 +72,33 @@ class AgentProvisionerTest extends Base
         $this->assertFalse($p->canManage($r['agent_user_id'], $otherId, false));  // stranger
         $this->assertTrue($p->canManage($r['agent_user_id'], $otherId, true));    // admin
     }
+
+    public function testCreateThrowsAndLeavesNothingWhenTheRosterWriteFails(): void
+    {
+        $ownerId = $this->owner();
+        $pdo = $this->container['db']->getConnection();
+        $pdo->exec("CREATE TRIGGER t BEFORE INSERT ON agents BEGIN SELECT RAISE(ABORT, 'injected'); END");
+        $thrown = null;
+        try {
+            (new AgentProvisioner($this->container))->create($ownerId, 'claude');
+        } catch (\Throwable $e) {
+            $thrown = $e;
+        }
+        $pdo->exec('DROP TRIGGER t');
+        $this->assertNotNull($thrown, 'create() throws when the roster write fails');
+        $this->assertEmpty($this->container['userModel']->getByUsername('carmelo.claude'));
+        $this->assertSame(0, $this->container['db']->table(UserModel::TABLE)->neq('api_access_token', '')->notNull('api_access_token')->count());
+        $this->assertSame([], (new AgentTable($this->container))->getAll());
+    }
+
+    public function testCreateDoesNotCommitACallersTransaction(): void
+    {
+        $ownerId = $this->owner();
+        $db = $this->container['db'];
+        $db->startTransaction();
+        (new AgentProvisioner($this->container))->create($ownerId, 'claude');
+        $db->cancelTransaction();
+        $this->assertEmpty($this->container['userModel']->getByUsername('carmelo.claude'));
+        $this->assertSame([], (new AgentTable($this->container))->getAll());
+    }
 }
