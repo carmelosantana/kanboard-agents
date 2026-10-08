@@ -148,10 +148,31 @@ class WipFlagRulesTest extends Base
         $this->assertSame([], $this->flags($this->doneAgo(2 * self::DAY, ['time_backfilled_at' => $this->meta((string) $endedAt)])));
     }
 
-    public function testTimemissWhenTheStampPredatesEndedAt(): void
+    /** Closed in Done: completed `$completedAgo`, last moved `$movedAgo`, with a Location and `$meta`. */
+    private function closedInDone(int $completedAgo, int $movedAgo, array $meta = []): array
+    {
+        return ['is_active' => 0, 'date_completed' => self::NOW - $completedAgo] + $this->doneAgo($movedAgo, $meta);
+    }
+
+    public function testTimemissOnAClosedTicketWhoseStampPredatesCompletion(): void
     {
         $stale = (string) (self::NOW - 2 * self::DAY - 1);
-        $this->assertSame(['timemiss'], $this->flags($this->doneAgo(2 * self::DAY, ['time_backfilled_at' => $this->meta($stale)])));
+        $this->assertSame(['timemiss'], $this->flags($this->closedInDone(2 * self::DAY, 2 * self::DAY, ['time_backfilled_at' => $this->meta($stale)])));
+    }
+
+    public function testClosedStampAfterCompletionClearsEvenIfMovedLater(): void
+    {
+        // Back-filled while closed outside Done, then moved to Done: the reconciler compares to date_completed only.
+        $stamp = (string) (self::NOW - 3 * self::DAY);
+        $this->assertSame([], $this->flags($this->closedInDone(4 * self::DAY, 2 * self::DAY, ['time_backfilled_at' => $this->meta($stamp)])));
+    }
+
+    public function testAnyNumericStampClearsAnOpenTicket(): void
+    {
+        $old = $this->meta((string) (self::NOW - 10 * self::DAY));
+        $this->assertSame([], $this->flags($this->doneAgo(2 * self::DAY, ['time_backfilled_at' => $old])));
+        $meta = ['loc_session_id' => $this->meta('sess-1'), 'loc_state' => $this->meta('ended', self::NOW - 2 * self::DAY), 'time_backfilled_at' => $old];
+        $this->assertNotContains('timemiss', $this->flags(['meta' => $meta]));
     }
 
     public function testTimemissWhenTheStampIsNotNumeric(): void

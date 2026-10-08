@@ -83,7 +83,8 @@ final class WipFlagRules
                 $stamp = (string) ($meta['time_backfilled_at']['value'] ?? '');
                 return ($meta['loc_session_id']['value'] ?? '') !== '' && $endedAt > 0
                     && $now - $endedAt > $cat->threshold('timemiss_hours') * 3600
-                    && (! ctype_digit($stamp) || (int) $stamp < $endedAt);
+                    // Same staleness test as the reconciler: closed compares to date_completed; open, any stamp clears.
+                    && (! ctype_digit($stamp) || (! $open && (int) $stamp < (int) $f['date_completed']));
         }
         return false;
     }
