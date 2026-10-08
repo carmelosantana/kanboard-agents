@@ -7,7 +7,10 @@ use Kanboard\Core\Security\Role;
 
 class AgentProvisioner extends Base
 {
-    /** Create an API-only agent user owned by $ownerUserId. Returns username/token/agent id. */
+    /**
+     * Create an API-only agent user owned by $ownerUserId. Returns username/token/agent id.
+     * Atomic (#6072): all three writes commit together or nothing is left, and any failure throws.
+     */
     public function create($ownerUserId, $kind, $label = '')
     {
         $owner = $this->userModel->getById($ownerUserId);
@@ -18,21 +21,38 @@ class AgentProvisioner extends Base
         $username = $this->nextUsername($owner['username'], $kind);
         $name = $label !== '' ? $label : ($owner['username']."'s ".$kind);
 
-        $agentId = $this->userModel->create([
-            'username' => $username,
-            'password' => bin2hex(random_bytes(24)), // random, never surfaced -> API-only
-            'name'     => $name,
-            'role'     => Role::APP_USER,
-        ]);
-        if ($agentId === false) {
-            throw new \RuntimeException('Failed to create agent user '.$username);
+        // Only commit a transaction this call opened; inside a caller's, leave the commit to the caller.
+        $owned = ! $this->db->getConnection()->inTransaction();
+        $this->db->startTransaction();
+        try {
+            $agentId = $this->userModel->create([
+                'username' => $username,
+                'password' => bin2hex(random_bytes(24)), // random, never surfaced -> API-only
+                'name'     => $name,
+                'role'     => Role::APP_USER,
+            ]);
+            if ($agentId === false) {
+                throw new \RuntimeException('Failed to create agent user '.$username);
+            }
+
+            $token = Token::getToken();
+            if (! $this->db->table(\Kanboard\Model\UserModel::TABLE)->eq('id', $agentId)->update(['api_access_token' => $token])) {
+                throw new \RuntimeException('Failed to set the API token of agent user '.$username);
+            }
+
+            // Owner-group is deferred from MVP (no consumer yet); the agents table is the roster.
+            if (! (new AgentTable($this->container))->insert($ownerUserId, $agentId, $kind)) {
+                throw new \RuntimeException('Failed to add agent user '.$username.' to the roster');
+            }
+
+            if ($owned) {
+                $this->db->closeTransaction();
+            }
+        } catch (\Throwable $e) {
+            // PicoDb may already have rolled back on an SQL error; cancelling again is then a no-op.
+            $this->db->cancelTransaction();
+            throw $e;
         }
-
-        $token = Token::getToken();
-        $this->db->table(\Kanboard\Model\UserModel::TABLE)->eq('id', $agentId)->update(['api_access_token' => $token]);
-
-        // Owner-group is deferred from MVP (no consumer yet); the agents table is the roster.
-        (new AgentTable($this->container))->insert($ownerUserId, $agentId, $kind);
 
         return ['agent_user_id' => (int) $agentId, 'username' => $username, 'token' => $token];
     }

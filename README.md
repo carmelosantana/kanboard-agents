@@ -42,6 +42,11 @@ project access via Kanboard's native project UI (owner adds the agent as a proje
   - `getAgents(owner_user_id = 0)` — app-admin only: lists the roster (`0` = every owner), with no secrets.
   - `disableAgent(agent_user_id)` — app-admin only: disables a roster agent; refuses non-agents.
 
+## 0.4.1 — atomic createAgent
+
+- `createAgent` (and My Agents' Create) now runs in one transaction, so a failure at any step leaves no
+  user, token or roster row behind.
+
 ## 0.4.0 — admin-only agent provisioning API
 
 All three JSON-RPC methods are app-admin only. A refusal comes back as `{ok: false, reason}`, never
@@ -49,7 +54,7 @@ as an error.
 
 - `createAgent(owner_user_id, kind, label = '')` → `{ok: true, agent_user_id, username, token}`.
   Reasons: `forbidden`, `invalid_kind` (not `^[a-z0-9-]{1,32}$`), `unknown_user`, `owner_is_agent`,
-  `create_failed` (the user could not be created; the cause is logged).
+  `create_failed` (nothing was created; the cause is logged).
   The token is returned once; the kanboard-admin MCP writes it to a mode-600 profile and never shows it.
 - `getAgents(owner_user_id = 0)` → `{ok: true, agents: [{agent_user_id, username, name, owner_user_id,
   kind, is_active}]}`; `0` lists every owner. No token or password is included. Reason: `forbidden`.

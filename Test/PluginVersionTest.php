@@ -10,7 +10,7 @@ class PluginVersionTest extends Base
     public function testVersionIsAlignedAt040(): void
     {
         $json = json_decode(file_get_contents(__DIR__.'/../plugin.json'), true);
-        $this->assertSame('0.4.0', $json['version']);
+        $this->assertSame('0.4.1', $json['version']);
         $this->assertSame($json['version'], (new Plugin($this->container))->getPluginVersion());
     }
 }
