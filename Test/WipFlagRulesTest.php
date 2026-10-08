@@ -128,11 +128,98 @@ class WipFlagRulesTest extends Base
         $this->assertSame([], $this->flags(['owner_id' => 0, 'owner_kind' => 'none', 'role' => 'ready']));
     }
 
+    /** An agent-owned ticket moved to Done `$secs` ago, with a Location; `$meta` adds metadata. */
+    private function doneAgo(int $secs, array $meta = []): array
+    {
+        $at = self::NOW - $secs;
+        return ['role' => 'done', 'date_moved' => $at, 'date_modification' => $at,
+                'meta' => ['loc_session_id' => $this->meta('sess-1')] + $meta];
+    }
+
     public function testTimemissAfterDoneWithoutBackfillStamp(): void
     {
-        $done = ['role' => 'done', 'date_moved' => self::NOW - 2 * self::DAY, 'date_modification' => self::NOW - 2 * self::DAY];
-        $this->assertSame(['timemiss'], $this->flags($done));
-        $this->assertSame([], $this->flags($done + ['meta' => ['time_backfilled_at' => $this->meta('1')]]));
+        $this->assertSame(['timemiss'], $this->flags($this->doneAgo(2 * self::DAY)));
+        $this->assertSame([], $this->flags($this->doneAgo(2 * self::DAY, ['time_backfilled_at' => $this->meta((string) self::NOW)])));
+    }
+
+    public function testTimemissClearedByAStampAtOrAfterEndedAt(): void
+    {
+        $endedAt = self::NOW - 2 * self::DAY;
+        $this->assertSame([], $this->flags($this->doneAgo(2 * self::DAY, ['time_backfilled_at' => $this->meta((string) $endedAt)])));
+    }
+
+    /** Closed in Done: completed `$completedAgo`, last moved `$movedAgo`, with a Location and `$meta`. */
+    private function closedInDone(int $completedAgo, int $movedAgo, array $meta = []): array
+    {
+        return ['is_active' => 0, 'date_completed' => self::NOW - $completedAgo] + $this->doneAgo($movedAgo, $meta);
+    }
+
+    public function testTimemissOnAClosedTicketWhoseStampPredatesCompletion(): void
+    {
+        $stale = (string) (self::NOW - 2 * self::DAY - 1);
+        $this->assertSame(['timemiss'], $this->flags($this->closedInDone(2 * self::DAY, 2 * self::DAY, ['time_backfilled_at' => $this->meta($stale)])));
+    }
+
+    public function testClosedStampAfterCompletionClearsEvenIfMovedLater(): void
+    {
+        // Back-filled while closed outside Done, then moved to Done: the reconciler compares to date_completed only.
+        $stamp = (string) (self::NOW - 3 * self::DAY);
+        $this->assertSame([], $this->flags($this->closedInDone(4 * self::DAY, 2 * self::DAY, ['time_backfilled_at' => $this->meta($stamp)])));
+    }
+
+    public function testAnyNumericStampClearsAnOpenTicket(): void
+    {
+        $old = $this->meta((string) (self::NOW - 10 * self::DAY));
+        $this->assertSame([], $this->flags($this->doneAgo(2 * self::DAY, ['time_backfilled_at' => $old])));
+        $meta = ['loc_session_id' => $this->meta('sess-1'), 'loc_state' => $this->meta('ended', self::NOW - 2 * self::DAY), 'time_backfilled_at' => $old];
+        $this->assertNotContains('timemiss', $this->flags(['meta' => $meta]));
+    }
+
+    public function testTimemissWhenTheStampIsNotNumeric(): void
+    {
+        $this->assertSame(['timemiss'], $this->flags($this->doneAgo(2 * self::DAY, ['time_backfilled_at' => $this->meta('garbage')])));
+    }
+
+    public function testTimemissNeedsALocation(): void
+    {
+        $f = $this->doneAgo(2 * self::DAY);
+        unset($f['meta']['loc_session_id']);
+        $this->assertSame([], $this->flags($f));
+        $f['meta']['loc_session_id'] = $this->meta('');
+        $this->assertSame([], $this->flags($f));
+    }
+
+    public function testTimemissWaitsOutTheWindow(): void
+    {
+        $this->assertSame([], $this->flags($this->doneAgo(23 * 3600)));
+    }
+
+    public function testTimemissWindowIsStrict(): void
+    {
+        $this->assertSame([], $this->flags($this->doneAgo(24 * 3600)));
+        $this->assertSame(['timemiss'], $this->flags($this->doneAgo(24 * 3600 + 1)));
+    }
+
+    public function testTimemissOnAClosedTicketOutsideDone(): void
+    {
+        $at = self::NOW - 2 * self::DAY;
+        $f = ['is_active' => 0, 'role' => 'in_progress', 'has_done' => true, 'date_completed' => $at,
+              'date_moved' => $at, 'date_modification' => $at, 'meta' => ['loc_session_id' => $this->meta('sess-1')]];
+        $this->assertContains('timemiss', $this->flags($f));
+        $this->assertContains('mismatch', $this->flags($f));
+    }
+
+    public function testTimemissWhenTheLocationEnded(): void
+    {
+        $meta = ['loc_session_id' => $this->meta('sess-1'), 'loc_state' => $this->meta('ended', self::NOW - 2 * self::DAY)];
+        $flags = $this->flags(['meta' => $meta]);
+        $this->assertContains('timemiss', $flags);
+        $this->assertContains('ended', $flags);
+    }
+
+    public function testTimemissIgnoresHumanTickets(): void
+    {
+        $this->assertNotContains('timemiss', $this->flags(['owner_id' => 2, 'owner_kind' => 'human'] + $this->doneAgo(2 * self::DAY)));
     }
 
     public function testHumanTicketsGetOnlyPositionFlags(): void

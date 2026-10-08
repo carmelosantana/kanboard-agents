@@ -50,15 +50,16 @@ class WipViewTest extends Base
         $this->assertStringStartsWith('sha256:', $env['catalogue_version']);
         $this->assertSame(['user_id' => $this->carmelo, 'resolved_from' => null], $env['viewer']);
         $this->assertSame('all', $env['scope']);
-        $this->assertSame(['merged', 'ended', 'unverified', 'timemiss'], $env['unavailable_flags']);
+        $this->assertSame(['merged', 'ended', 'unverified'], $env['unavailable_flags']);
     }
 
     public function testUnavailableFlagCountsAreNullOthersZero(): void
     {
         $s = $this->rpc()['summary'];
-        foreach (['merged', 'ended', 'unverified', 'timemiss'] as $k) {
+        foreach (['merged', 'ended', 'unverified'] as $k) {
             $this->assertNull($s[$k], $k);
         }
+        $this->assertIsInt($s['timemiss']);
         foreach (['in_progress', 'flagged', 'stale', 'donesubs', 'offboard', 'mismatch', 'blocked', 'noowner'] as $k) {
             $this->assertSame(0, $s[$k], $k);
         }
@@ -260,6 +261,40 @@ class WipViewTest extends Base
         $this->touch($t, ['is_active' => 0, 'date_completed' => $this->now - 40 * self::DAY]);
         $this->assertSame([], $this->rpc()['rows']);
         $this->assertSame([['mismatch']], array_column($this->rpc(null, 'all', null, false, 60)['rows'], 'flags'));
+    }
+
+    /** An agent-owned ticket closed in the Done column 2 days ago; `$meta` is saved as task metadata. */
+    private function closedInDone(array $meta): int
+    {
+        $t = $this->task($this->pid, 'Done', $this->claude);
+        if ($meta !== []) {
+            $this->container['taskMetadataModel']->save($t, $meta);
+        }
+        $at = $this->now - 2 * self::DAY;
+        $this->touch($t, ['is_active' => 0, 'date_completed' => $at, 'date_moved' => $at, 'date_modification' => $at]);
+        return $t;
+    }
+
+    public function testTimemissOnATicketClosedInDone(): void
+    {
+        $t = $this->closedInDone(['loc_session_id' => 'sess-1']);
+        $env = $this->rpc();
+        $this->assertSame([[$t, ['timemiss']]], array_map(fn ($r) => [$r['task_id'], $r['flags']], $env['rows']));
+        $this->assertSame(1, $env['summary']['timemiss']);
+    }
+
+    public function testClosedInDoneWithAFreshStampHasNoRow(): void
+    {
+        $this->closedInDone(['loc_session_id' => 'sess-1', 'time_backfilled_at' => (string) $this->now]);
+        $env = $this->rpc();
+        $this->assertSame([], $env['rows']);
+        $this->assertSame(0, $env['summary']['timemiss']);
+    }
+
+    public function testClosedInDoneWithoutALocationIsNotReturned(): void
+    {
+        $this->closedInDone([]);
+        $this->assertSame([], $this->rpc()['rows']);
     }
 
     public function testEmptyProjectSetReturnsEarlyWithNoRows(): void

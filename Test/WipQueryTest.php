@@ -73,6 +73,22 @@ class WipQueryTest extends Base
         $this->assertSame([$recent, $open], $ids);
     }
 
+    public function testClosedInDoneIsReturnedOnlyWithALocationInsideTheWindow(): void
+    {
+        $done = $this->col($this->pid, 'Done');
+        $located = $this->task($this->pid, 'Done');
+        $emptyLoc = $this->task($this->pid, 'Done');
+        $oldLocated = $this->task($this->pid, 'Done');
+        $this->container['taskMetadataModel']->save($located, ['loc_session_id' => 'sess-1']);
+        $this->container['taskMetadataModel']->save($emptyLoc, ['loc_session_id' => '']);
+        $this->container['taskMetadataModel']->save($oldLocated, ['loc_session_id' => 'sess-2']);
+        $this->touch($located, ['is_active' => 0, 'date_completed' => 5000]);
+        $this->touch($emptyLoc, ['is_active' => 0, 'date_completed' => 5000]);
+        $this->touch($oldLocated, ['is_active' => 0, 'date_completed' => 10]);
+        $ids = array_map('intval', array_column($this->q()->tasks([$this->pid], [$done], 1000), 'id'));
+        $this->assertSame([$located], $ids);
+    }
+
     public function testClosedWindowStillWorksWithNoDoneColumn(): void
     {
         $t = $this->task($this->pid, 'In progress');

@@ -40,8 +40,8 @@ class WipCatalogueTest extends Base
     public function testUnavailableFlagsAreTheOnesWithRequires(): void
     {
         $c = new WipCatalogue();
-        $this->assertSame(['merged', 'ended', 'unverified', 'timemiss'], $c->unavailable());
-        $this->assertSame(['stale', 'donesubs', 'offboard', 'mismatch', 'blocked', 'noowner'], $c->available());
+        $this->assertSame(['merged', 'ended', 'unverified'], $c->unavailable());
+        $this->assertSame(['stale', 'donesubs', 'offboard', 'mismatch', 'blocked', 'noowner', 'timemiss'], $c->available());
     }
 
     public function testRejectsMissingFlag(): void

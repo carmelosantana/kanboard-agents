@@ -27,8 +27,8 @@ project access via Kanboard's native project UI (owner adds the agent as a proje
   `🧭 WIP view: <action> (<flag>) by <user>`.
 - **Show unflagged** adds In-progress tickets that have no flag.
 - **Flags:** `catalogue.json` is the canonical catalogue (weights, labels, thresholds);
-  `catalogue_version` is its sha256. Flags whose data does not exist yet (Location, PR state,
-  time back-fill) report `null` counts and are listed in `unavailable_flags`.
+  `catalogue_version` is its sha256. Flags still gated by `requires` (`merged`, `ended`, `unverified`)
+  report `null` counts and are listed in `unavailable_flags`.
 - **JSON-RPC:**
   - `getWipFlags(owner_user_id?, scope = all|agents|mine, project_ids?, include_unflagged = false, closed_lookback_days = 30)`
     — read-only. The application token may call it and must pass `owner_user_id`. Refusals come back
@@ -37,6 +37,14 @@ project access via Kanboard's native project UI (owner adds the agent as a proje
     `{ok: true, task_id, action, comment_id}` or `{ok: false, reason}`. Refuses the application token.
   - `adoptAgent(agent_user_id, owner_user_id, kind)` — app-admin only: registers an existing user as an
     agent of an owner (also on My Agents for admins).
+
+## 0.3.3 — Time missing on
+
+- **Time missing** (`timemiss`) is now evaluated: an agent-owned ticket with a Location
+  (`loc_session_id`) whose work ended more than `timemiss_hours` (24 h) ago — in Done (open, or closed
+  within `closed_lookback_days`), closed outside Done within the lookback, or its session `ended` — and
+  whose `time_backfilled_at` stamp is missing or non-numeric, or (closed tickets only) older than
+  `date_completed`, the reconciler's own staleness test.
 
 ## 0.3.2 — batch roster lookup
 
