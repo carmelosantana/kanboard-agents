@@ -79,7 +79,7 @@ final class WipFlagRules
             case 'timemiss':
                 $endedAt = $f['role'] === 'done' || ! $open
                     ? max((int) $f['date_completed'], (int) $f['date_moved'])
-                    : ($loc === 'ended' ? (int) $meta['loc_state']['changed_on'] : 0);
+                    : ($loc === 'ended' ? (int) ($meta['loc_state']['changed_on'] ?? 0) : 0);
                 $stamp = (string) ($meta['time_backfilled_at']['value'] ?? '');
                 return ($meta['loc_session_id']['value'] ?? '') !== '' && $endedAt > 0
                     && $now - $endedAt > $cat->threshold('timemiss_hours') * 3600

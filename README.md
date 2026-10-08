@@ -41,8 +41,9 @@ project access via Kanboard's native project UI (owner adds the agent as a proje
 ## 0.3.3 — Time missing on
 
 - **Time missing** (`timemiss`) is now evaluated: an agent-owned ticket with a Location
-  (`loc_session_id`) that ended — moved to Done, closed, or its session `ended` — more than 24 h ago
-  and whose `time_backfilled_at` stamp is missing, non-numeric or older than that end.
+  (`loc_session_id`) whose work ended more than `timemiss_hours` (24 h) ago — in Done (open, or closed
+  within `closed_lookback_days`), closed outside Done within the lookback, or its session `ended` — and
+  whose `time_backfilled_at` stamp is missing, non-numeric or older than that end.
 
 ## 0.3.2 — batch roster lookup
 

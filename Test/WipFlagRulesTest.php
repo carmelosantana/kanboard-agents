@@ -128,7 +128,7 @@ class WipFlagRulesTest extends Base
         $this->assertSame([], $this->flags(['owner_id' => 0, 'owner_kind' => 'none', 'role' => 'ready']));
     }
 
-    /** An agent-owned ticket moved to Done 2 days ago, with a Location; `$meta` adds metadata. */
+    /** An agent-owned ticket moved to Done `$secs` ago, with a Location; `$meta` adds metadata. */
     private function doneAgo(int $secs, array $meta = []): array
     {
         $at = self::NOW - $secs;
@@ -171,6 +171,12 @@ class WipFlagRulesTest extends Base
     public function testTimemissWaitsOutTheWindow(): void
     {
         $this->assertSame([], $this->flags($this->doneAgo(23 * 3600)));
+    }
+
+    public function testTimemissWindowIsStrict(): void
+    {
+        $this->assertSame([], $this->flags($this->doneAgo(24 * 3600)));
+        $this->assertSame(['timemiss'], $this->flags($this->doneAgo(24 * 3600 + 1)));
     }
 
     public function testTimemissOnAClosedTicketOutsideDone(): void
