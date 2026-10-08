@@ -97,7 +97,12 @@ class AgentProvisioner extends Base
         if ((new AgentTable($this->container))->isAgent($ownerUserId)) {
             return ['ok' => false, 'reason' => 'owner_is_agent'];
         }
-        return ['ok' => true] + $this->create($ownerUserId, $kind, is_string($label) ? trim($label) : '');
+        try {
+            return ['ok' => true] + $this->create($ownerUserId, $kind, is_string($label) ? trim($label) : '');
+        } catch (\Throwable $e) {
+            $this->logger->error('Agents createAgent: '.$e->getMessage());
+            return ['ok' => false, 'reason' => 'create_failed'];
+        }
     }
 
     /** Admin-only roster listing; 0 = every owner. No credential column is ever read. */

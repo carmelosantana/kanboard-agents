@@ -88,4 +88,32 @@ class AgentProcedureTest extends Base
         $this->assertSame(['ok' => false, 'reason' => 'not_agent'], $this->rpc()->disableAgent($this->admin));
         $this->assertSame(1, (int) $this->container['userModel']->getById($this->owner)['is_active']);
     }
+
+    public function testCreateFailureIsARefusalNotAnException(): void
+    {
+        // Exhaust nextUsername (base + .2..999) so create() throws inside createForApi.
+        $db = $this->container['db'];
+        $db->startTransaction();
+        $db->table('users')->insert(['username' => 'carmelo.codex', 'password' => 'x']);
+        for ($n = 2; $n < 1000; $n++) {
+            $db->table('users')->insert(['username' => 'carmelo.codex.'.$n, 'password' => 'x']);
+        }
+        $db->closeTransaction();
+        $this->actAs($this->admin);
+        $this->assertSame(['ok' => false, 'reason' => 'create_failed'], $this->rpc()->createAgent($this->owner, 'codex', ''));
+        $this->assertSame([], (new AgentTable($this->container))->getAll());
+    }
+
+    public function testGetAgentsFiltersByOwner(): void
+    {
+        $this->actAs($this->admin);
+        $other = $this->container['userModel']->create(['username' => 'someone', 'password' => 'x1234567', 'role' => 'app-user']);
+        $mine = $this->rpc()->createAgent($this->owner, 'codex', '');
+        $this->rpc()->createAgent($other, 'codex', '');
+        $r = $this->rpc()->getAgents($this->owner);
+        $this->assertTrue($r['ok']);
+        $this->assertSame([$mine['agent_user_id']], array_column($r['agents'], 'agent_user_id'));
+        $this->assertSame($this->owner, $r['agents'][0]['owner_user_id']);
+        $this->assertCount(2, $this->rpc()->getAgents(0)['agents']);
+    }
 }

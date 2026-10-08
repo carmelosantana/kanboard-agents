@@ -37,6 +37,10 @@ project access via Kanboard's native project UI (owner adds the agent as a proje
     `{ok: true, task_id, action, comment_id}` or `{ok: false, reason}`. Refuses the application token.
   - `adoptAgent(agent_user_id, owner_user_id, kind)` — app-admin only: registers an existing user as an
     agent of an owner (also on My Agents for admins).
+  - `createAgent(owner_user_id, kind, label = '')` — app-admin only: creates an API-only agent for an
+    owner and returns its token once.
+  - `getAgents(owner_user_id = 0)` — app-admin only: lists the roster (`0` = every owner), with no secrets.
+  - `disableAgent(agent_user_id)` — app-admin only: disables a roster agent; refuses non-agents.
 
 ## 0.4.0 — admin-only agent provisioning API
 
@@ -44,7 +48,8 @@ All three JSON-RPC methods are app-admin only. A refusal comes back as `{ok: fal
 as an error.
 
 - `createAgent(owner_user_id, kind, label = '')` → `{ok: true, agent_user_id, username, token}`.
-  Reasons: `forbidden`, `invalid_kind` (not `^[a-z0-9-]{1,32}$`), `unknown_user`, `owner_is_agent`.
+  Reasons: `forbidden`, `invalid_kind` (not `^[a-z0-9-]{1,32}$`), `unknown_user`, `owner_is_agent`,
+  `create_failed` (the user could not be created; the cause is logged).
   The token is returned once; the kanboard-admin MCP writes it to a mode-600 profile and never shows it.
 - `getAgents(owner_user_id = 0)` → `{ok: true, agents: [{agent_user_id, username, name, owner_user_id,
   kind, is_active}]}`; `0` lists every owner. No token or password is included. Reason: `forbidden`.
