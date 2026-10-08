@@ -80,6 +80,64 @@ class AgentProvisioner extends Base
         return ['ok' => true, 'agent_user_id' => $agentUserId, 'owner_user_id' => $ownerUserId, 'kind' => $kind];
     }
 
+    /** Admin-only API create (#4568). The token is returned once and is not readable anywhere afterwards. */
+    public function createForApi($ownerUserId, $kind, $label): array
+    {
+        if (! $this->userSession->isLogged() || ! $this->userSession->isAdmin()) {
+            return ['ok' => false, 'reason' => 'forbidden'];
+        }
+        $ownerUserId = Params::id($ownerUserId);
+        $kind = is_string($kind) ? strtolower(trim($kind)) : '';
+        if ($kind === '' || ! preg_match('/^[a-z0-9-]{1,32}$/', $kind)) {
+            return ['ok' => false, 'reason' => 'invalid_kind'];
+        }
+        if ($ownerUserId === 0 || empty($this->userModel->getById($ownerUserId))) {
+            return ['ok' => false, 'reason' => 'unknown_user'];
+        }
+        if ((new AgentTable($this->container))->isAgent($ownerUserId)) {
+            return ['ok' => false, 'reason' => 'owner_is_agent'];
+        }
+        return ['ok' => true] + $this->create($ownerUserId, $kind, is_string($label) ? trim($label) : '');
+    }
+
+    /** Admin-only roster listing; 0 = every owner. No credential column is ever read. */
+    public function listForApi($ownerUserId): array
+    {
+        if (! $this->userSession->isLogged() || ! $this->userSession->isAdmin()) {
+            return ['ok' => false, 'reason' => 'forbidden'];
+        }
+        $ownerUserId = Params::id($ownerUserId);
+        $roster = new AgentTable($this->container);
+        $rows = $ownerUserId === 0 ? $roster->getAll() : $roster->getByOwner($ownerUserId);
+        $agents = [];
+        foreach ($rows as $row) {
+            $u = $this->userModel->getById((int) $row['agent_user_id']);
+            $agents[] = [
+                'agent_user_id' => (int) $row['agent_user_id'],
+                'username' => $u['username'] ?? '',
+                'name' => $u['name'] ?? '',
+                'owner_user_id' => (int) $row['owner_user_id'],
+                'kind' => $row['kind'],
+                'is_active' => (int) ($u['is_active'] ?? 0),
+            ];
+        }
+        return ['ok' => true, 'agents' => $agents];
+    }
+
+    /** Admin-only disable, limited to roster agents so it can never lock out a human. */
+    public function disableForApi($agentUserId): array
+    {
+        if (! $this->userSession->isLogged() || ! $this->userSession->isAdmin()) {
+            return ['ok' => false, 'reason' => 'forbidden'];
+        }
+        $agentUserId = Params::id($agentUserId);
+        if ($agentUserId === 0 || ! (new AgentTable($this->container))->isAgent($agentUserId)) {
+            return ['ok' => false, 'reason' => 'not_agent'];
+        }
+        $this->disable($agentUserId);
+        return ['ok' => true, 'agent_user_id' => $agentUserId];
+    }
+
     public function disable($agentUserId)
     {
         return $this->userModel->disable((int) $agentUserId);

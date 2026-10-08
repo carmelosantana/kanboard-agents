@@ -38,6 +38,19 @@ project access via Kanboard's native project UI (owner adds the agent as a proje
   - `adoptAgent(agent_user_id, owner_user_id, kind)` — app-admin only: registers an existing user as an
     agent of an owner (also on My Agents for admins).
 
+## 0.4.0 — admin-only agent provisioning API
+
+All three JSON-RPC methods are app-admin only. A refusal comes back as `{ok: false, reason}`, never
+as an error.
+
+- `createAgent(owner_user_id, kind, label = '')` → `{ok: true, agent_user_id, username, token}`.
+  Reasons: `forbidden`, `invalid_kind` (not `^[a-z0-9-]{1,32}$`), `unknown_user`, `owner_is_agent`.
+  The token is returned once; the kanboard-admin MCP writes it to a mode-600 profile and never shows it.
+- `getAgents(owner_user_id = 0)` → `{ok: true, agents: [{agent_user_id, username, name, owner_user_id,
+  kind, is_active}]}`; `0` lists every owner. No token or password is included. Reason: `forbidden`.
+- `disableAgent(agent_user_id)` → `{ok: true, agent_user_id}`. Reasons: `forbidden`, `not_agent`
+  (only roster agents can be disabled, so it never locks out a human).
+
 ## 0.3.3 — Time missing on
 
 - **Time missing** (`timemiss`) is now evaluated: an agent-owned ticket with a Location

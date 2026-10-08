@@ -13,4 +13,19 @@ class AgentsRosterProcedure extends BaseProcedure
     {
         return (new AgentProvisioner($this->container))->adopt($agent_user_id, $owner_user_id, $kind);
     }
+
+    public function createAgent($owner_user_id, $kind, $label = '')
+    {
+        return (new AgentProvisioner($this->container))->createForApi($owner_user_id, $kind, $label);
+    }
+
+    public function getAgents($owner_user_id = 0)
+    {
+        return (new AgentProvisioner($this->container))->listForApi($owner_user_id);
+    }
+
+    public function disableAgent($agent_user_id)
+    {
+        return (new AgentProvisioner($this->container))->disableForApi($agent_user_id);
+    }
 }

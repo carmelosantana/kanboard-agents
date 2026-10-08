@@ -41,6 +41,6 @@ class Plugin extends Base
     public function getPluginName(): string        { return 'Agents'; }
     public function getPluginDescription(): string { return t('Provision API-only agent users that drive Kanboard via MCP, and see their work in progress.'); }
     public function getPluginAuthor(): string      { return 'Carmelo Santana'; }
-    public function getPluginVersion(): string     { return '0.3.3'; }
+    public function getPluginVersion(): string     { return '0.4.0'; }
     public function getCompatibleVersion(): string { return '>=1.2.47'; }
 }
