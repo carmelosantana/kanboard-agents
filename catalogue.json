@@ -11,6 +11,6 @@
     {"key": "blocked", "label": "Blocked", "weight": 2, "fix": "Answer the question", "oneclick": false, "requires": null, "applies_to": "all"},
     {"key": "unverified", "label": "Unverified", "weight": 2, "fix": "Check that host", "oneclick": false, "requires": "location", "applies_to": "agents"},
     {"key": "noowner", "label": "No owner", "weight": 1, "fix": "Assign", "oneclick": true, "requires": null, "applies_to": "unowned"},
-    {"key": "timemiss", "label": "Time missing", "weight": 1, "fix": "Install back-fill", "oneclick": false, "requires": "backfill", "applies_to": "agents"}
+    {"key": "timemiss", "label": "Time missing", "weight": 1, "fix": "Install back-fill", "oneclick": false, "requires": null, "applies_to": "agents"}
   ]
 }

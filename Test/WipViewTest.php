@@ -50,15 +50,16 @@ class WipViewTest extends Base
         $this->assertStringStartsWith('sha256:', $env['catalogue_version']);
         $this->assertSame(['user_id' => $this->carmelo, 'resolved_from' => null], $env['viewer']);
         $this->assertSame('all', $env['scope']);
-        $this->assertSame(['merged', 'ended', 'unverified', 'timemiss'], $env['unavailable_flags']);
+        $this->assertSame(['merged', 'ended', 'unverified'], $env['unavailable_flags']);
     }
 
     public function testUnavailableFlagCountsAreNullOthersZero(): void
     {
         $s = $this->rpc()['summary'];
-        foreach (['merged', 'ended', 'unverified', 'timemiss'] as $k) {
+        foreach (['merged', 'ended', 'unverified'] as $k) {
             $this->assertNull($s[$k], $k);
         }
+        $this->assertIsInt($s['timemiss']);
         foreach (['in_progress', 'flagged', 'stale', 'donesubs', 'offboard', 'mismatch', 'blocked', 'noowner'] as $k) {
             $this->assertSame(0, $s[$k], $k);
         }

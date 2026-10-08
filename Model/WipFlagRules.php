@@ -77,11 +77,13 @@ final class WipFlagRules
             case 'noowner':
                 return $ip && (int) $f['owner_id'] === 0 && $f['agent_member'];
             case 'timemiss':
-                $endedAt = $f['role'] === 'done'
+                $endedAt = $f['role'] === 'done' || ! $open
                     ? max((int) $f['date_completed'], (int) $f['date_moved'])
                     : ($loc === 'ended' ? (int) $meta['loc_state']['changed_on'] : 0);
-                return $endedAt > 0 && ! isset($meta['time_backfilled_at'])
-                    && $now - $endedAt > $cat->threshold('timemiss_hours') * 3600;
+                $stamp = (string) ($meta['time_backfilled_at']['value'] ?? '');
+                return ($meta['loc_session_id']['value'] ?? '') !== '' && $endedAt > 0
+                    && $now - $endedAt > $cat->threshold('timemiss_hours') * 3600
+                    && (! ctype_digit($stamp) || (int) $stamp < $endedAt);
         }
         return false;
     }
