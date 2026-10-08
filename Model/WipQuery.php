@@ -4,9 +4,10 @@ namespace Kanboard\Plugin\Agents\Model;
 use Kanboard\Core\Base;
 
 // The flat passes behind getWipFlags (research #4881): columns, task pass, metadata pass, tag pass.
-// The roster pass lives in WipScope. Grouped derived tables only, never correlated subqueries
-// (2.0 s on Postgres, 8.3 s on SQLite at 10x). Column titles and tag names are matched in PHP,
-// because MariaDB's utf8mb4_unicode_ci compares case- and pad-space-insensitively.
+// The roster pass lives in WipScope. Grouped derived tables, not correlated subqueries
+// (2.0 s on Postgres, 8.3 s on SQLite at 10x); the one exception is the bounded EXISTS in tasks().
+// Column titles and tag names are matched in PHP, because MariaDB's utf8mb4_unicode_ci compares
+// case- and pad-space-insensitively.
 class WipQuery extends Base
 {
     const META_KEYS = [
@@ -58,7 +59,7 @@ class WipQuery extends Base
     /**
      * Open tasks, plus tasks closed since $closedSince that sit outside Done (mismatch) or sit in Done
      * with a non-empty `loc_session_id` (timemiss). One row per task. The EXISTS probe is the one
-     * correlated subquery: it runs only for closed rows inside the lookback, on the metadata primary key.
+     * correlated subquery: it runs only for closed rows inside the lookback, on the unique (task_id, name) index.
      */
     public function tasks(array $projectIds, array $doneColumnIds, int $closedSince, ?int $taskId = null): array
     {
