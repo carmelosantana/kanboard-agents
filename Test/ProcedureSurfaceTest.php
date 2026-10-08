@@ -11,7 +11,7 @@ class ProcedureSurfaceTest extends Base
 {
     const SURFACE = [
         AgentsWipProcedure::class => ['getWipFlags', 'applyWipFix'],
-        AgentsRosterProcedure::class => ['adoptAgent'],
+        AgentsRosterProcedure::class => ['adoptAgent', 'createAgent', 'getAgents', 'disableAgent'],
     ];
 
     public function testProcedureClassesDeclareOnlyTheirRpcMethods(): void
