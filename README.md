@@ -38,6 +38,10 @@ project access via Kanboard's native project UI (owner adds the agent as a proje
   - `adoptAgent(agent_user_id, owner_user_id, kind)` — app-admin only: registers an existing user as an
     agent of an owner (also on My Agents for admins).
 
+## 0.3.2 — batch roster lookup
+
+- `AgentTable::agentIds(array $userIds)` — batch roster lookup; used by the Presence plugin to badge agents.
+
 ## 0.3.1 — provenance relabel
 
 - Schema **v3** runs once on load: every task stamped `moved_by_kind=human` whose `moved_by_uid` is in
