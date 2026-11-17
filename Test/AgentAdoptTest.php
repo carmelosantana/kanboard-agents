@@ -119,6 +119,14 @@ class AgentAdoptTest extends Base
         $this->assertFalse((new AgentTable($this->container))->isAgent($other));
     }
 
+    public function testAnAdministratorCannotBeAdopted(): void
+    {
+        $this->actAs($this->admin);
+        $other = $this->container['userModel']->create(['username' => 'root2', 'password' => 'x1234567', 'role' => 'app-admin']);
+        $this->assertSame(['ok' => false, 'reason' => 'agent_is_admin'], $this->rpc()->adoptAgent($other, $this->owner, 'claude'));
+        $this->assertFalse((new AgentTable($this->container))->isAgent($other));
+    }
+
     public function testNonAdminIsForbidden(): void
     {
         $this->actAs($this->owner);

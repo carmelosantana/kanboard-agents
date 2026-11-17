@@ -36,7 +36,7 @@ project access via Kanboard's native project UI (owner adds the agent as a proje
   - `applyWipFix(task_id, action = move_to_done|assign, expected_date_modification, assignee_id?)` →
     `{ok: true, task_id, action, comment_id}` or `{ok: false, reason}`. Refuses the application token.
   - `adoptAgent(agent_user_id, owner_user_id, kind)` — app-admin only: registers an existing user as an
-    agent of an owner (also on My Agents for admins).
+    agent of an owner (also on My Agents for admins). An administrator cannot be adopted (`agent_is_admin`).
   - `createAgent(owner_user_id, kind, label = '')` — app-admin only: creates an API-only agent for an
     owner and returns its token once.
   - `getAgents(owner_user_id = 0)` — app-admin only: lists the roster (`0` = every owner), with no secrets.
