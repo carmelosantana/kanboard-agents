@@ -79,6 +79,10 @@ class AgentProvisioner extends Base
         if ($agentUserId === $ownerUserId) {
             return ['ok' => false, 'reason' => 'self'];
         }
+        // An agent is managed by its owner, so an administrator can never be one.
+        if (($this->userModel->getById($agentUserId)['role'] ?? '') === Role::APP_ADMIN) {
+            return ['ok' => false, 'reason' => 'agent_is_admin'];
+        }
         // The roster is one level deep: an owner is never an agent, and an agent never owns agents.
         $roster = new AgentTable($this->container);
         if ($roster->getByOwner($agentUserId) !== []) {
