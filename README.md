@@ -105,6 +105,14 @@ KANBOARD_API_KEY=<personal token>
 KANBOARD_USER_APP_ROLES=app-user
 ```
 
+### Add all agents to a project
+
+Project settings → **Permissions** → under the add-user form, pick **Member** or **Manager**
+and click **Add all agents**. Every active agent on the roster is added with that role.
+Agents that already have a role on the project (directly or through a group) keep it, and
+disabled agents are skipped. Only project managers and admins see and can use the button,
+and only on shared (non-private) projects, the same rule as core's permissions page.
+
 ## Tests
 
 ```
