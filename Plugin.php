@@ -2,6 +2,7 @@
 namespace Kanboard\Plugin\Agents;
 
 use Kanboard\Core\Plugin\Base;
+use Kanboard\Core\Security\Role;
 use Kanboard\Core\Translator;
 use Kanboard\Plugin\Agents\Api\AgentsRosterProcedure;
 use Kanboard\Plugin\Agents\Api\AgentsWipProcedure;
@@ -15,6 +16,7 @@ class Plugin extends Base
         $this->hook->on('template:header:dropdown', ['template' => 'Agents:header/dropdown']);
         $this->hook->on('template:dashboard:sidebar', ['template' => 'Agents:dashboard/sidebar']);
         $this->hook->on('template:layout:css', ['template' => 'plugins/Agents/Assets/badge.css']);
+        $this->hook->on('template:project-permission:after-adduser', ['template' => 'Agents:project_permission/add_all']);
         $container = $this->container;
         $this->hook->on('template:layout:top', [
             'template' => 'Agents:layout/badge',
@@ -28,6 +30,8 @@ class Plugin extends Base
         $this->route->addRoute('agents/create',  'AgentController', 'create',  'Agents');
         $this->route->addRoute('agents/disable', 'AgentController', 'disable', 'Agents');
         $this->route->addRoute('agents/adopt',   'AgentController', 'adopt',   'Agents');
+        $this->route->addRoute('agents/project/add-all', 'AgentProjectController', 'addAll', 'Agents');
+        $this->projectAccessMap->add('AgentProjectController', 'addAll', Role::PROJECT_MANAGER);
         $this->route->addRoute('wip',            'WipController',   'index',   'Agents');
         $this->route->addRoute('wip/fix',        'WipController',   'fix',     'Agents');
 
