@@ -42,6 +42,11 @@ project access via Kanboard's native project UI (owner adds the agent as a proje
   - `getAgents(owner_user_id = 0)` — app-admin only: lists the roster (`0` = every owner), with no secrets.
   - `disableAgent(agent_user_id)` — app-admin only: disables a roster agent; refuses non-agents.
 
+## 0.5.0 — add all agents to a project
+
+Project settings → Permissions gets an **Add all agents** button (Member or Manager). See
+[Add all agents to a project](#add-all-agents-to-a-project).
+
 ## 0.4.1 — atomic createAgent
 
 - `createAgent` (and My Agents' Create) now runs in one transaction, so a failure at any step leaves no

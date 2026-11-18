@@ -7,10 +7,10 @@ use Kanboard\Plugin\Agents\Plugin;
 // Tag == plugin.json == getPluginVersion(): drift across the three is the most common release defect.
 class PluginVersionTest extends Base
 {
-    public function testVersionIsAlignedAt042(): void
+    public function testVersionIsAlignedAt050(): void
     {
         $json = json_decode(file_get_contents(__DIR__.'/../plugin.json'), true);
-        $this->assertSame('0.4.2', $json['version']);
+        $this->assertSame('0.5.0', $json['version']);
         $this->assertSame($json['version'], (new Plugin($this->container))->getPluginVersion());
     }
 }
