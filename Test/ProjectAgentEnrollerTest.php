@@ -8,6 +8,7 @@ use Kanboard\Core\Security\Role;
 use Kanboard\Plugin\Agents\Controller\AgentProjectController;
 use Kanboard\Plugin\Agents\Model\AgentTable;
 use Kanboard\Plugin\Agents\Model\ProjectAgentEnroller;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 class ProjectAgentEnrollerTest extends Base
 {
@@ -109,6 +110,7 @@ class ProjectAgentEnrollerTest extends Base
     }
 
     /** @dataProvider rejectedRoles */
+    #[DataProvider('rejectedRoles')]
     public function testRejectsAnyRoleButMemberOrManager(string $role): void
     {
         $a = $this->agent('a.claude');
